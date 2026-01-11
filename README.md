@@ -17,7 +17,7 @@ Go web framework dengan ruh CodeIgniter 3.
 # Clone & setup
 git clone <repo>
 cd goigniter
-cp .env.example .env  # edit DB_DSN
+cp .env.example .env  # edit konfigurasi database
 
 # Run
 go run main.go
@@ -125,7 +125,11 @@ goigniter/
 
 | Variable | Description | Default |
 |----------|-------------|---------|
-| `DB_DSN` | MySQL connection string | - |
+| `DB_HOST` | Database host | `127.0.0.1` |
+| `DB_PORT` | Database port | `3306` |
+| `DB_USER` | Database username | `root` |
+| `DB_PASSWORD` | Database password | - |
+| `DB_NAME` | Database name | `goigniter` |
 | `APP_PORT` | Server port | `:6789` |
 
 ## Tech Stack
