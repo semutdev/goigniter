@@ -111,21 +111,6 @@ Buka http://localhost:6789
 
 ---
 
-## Quick Start
-
-```bash
-# Clone & setup
-git clone https://github.com/semutdev/goigniter
-cd goigniter
-cp .env.example .env
-
-# Edit .env sesuai kebutuhan
-# Jalankan
-go run main.go
-```
-
----
-
 ## Struktur Folder
 
 ```
@@ -137,7 +122,6 @@ goigniter/
 │   │   ├── dashboard.go
 │   │   └── product.go
 │   ├── auth.go             # Controller authentication
-│   ├── init.go             # Package init
 │   └── welcome.go          # Controller welcome
 ├── database/
 │   └── seeder.go           # Database seeder
