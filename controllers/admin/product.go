@@ -1,4 +1,4 @@
-package controllers
+package admin
 
 import (
 	"goigniter/config"
@@ -12,7 +12,7 @@ import (
 )
 
 func init() {
-	libs.Register("users", &Users{})
+	libs.Register("product", &Product{})
 }
 
 type UserForm struct {
@@ -20,11 +20,11 @@ type UserForm struct {
 	Email string `form:"email" validate:"required,email"`
 }
 
-type Users struct{}
+type Product struct{}
 
-func (u *Users) Index(c echo.Context) error {
-	var users []models.User
-	result := config.DB.Order("created_at desc").Find(&users)
+func (u *Product) Index(c echo.Context) error {
+	var product []models.User
+	result := config.DB.Order("created_at desc").Find(&product)
 
 	if result.Error != nil {
 		return c.String(http.StatusInternalServerError, "Database Error")
@@ -32,16 +32,16 @@ func (u *Users) Index(c echo.Context) error {
 
 	// send data to view
 	data := map[string]interface{}{
-		"Title":  "User Management",
-		"Users":  users,
-		"Values": UserForm{},
-		"Errors": map[string]string{},
+		"Title":   "User Management",
+		"Product": product,
+		"Values":  UserForm{},
+		"Errors":  map[string]string{},
 	}
 
 	return c.Render(http.StatusOK, "index", data)
 }
 
-func (u *Users) Add(c echo.Context) error {
+func (u *Product) Add(c echo.Context) error {
 	form := new(UserForm)
 
 	// 1. Tangkap Input
@@ -77,10 +77,12 @@ func (u *Users) Add(c echo.Context) error {
 	}
 
 	// 3. JIKA SUKSES
+	firstName := form.Name
 	newUser := models.User{
-		Name:      form.Name,
+		FirstName: &firstName,
 		Email:     form.Email,
-		CreatedAt: time.Now(),
+		CreatedOn: time.Now().Unix(),
+		Active:    true,
 	}
 
 	config.DB.Create(&newUser)
@@ -88,16 +90,16 @@ func (u *Users) Add(c echo.Context) error {
 	c.Response().Header().Set("HX-Trigger", "reset-form")
 
 	// Ambil data terbaru
-	var users []models.User
-	config.DB.Order("created_at desc").Find(&users)
+	var product []models.User
+	config.DB.Order("created_at desc").Find(&product)
 
 	// Render tabelnya (Target asli form adalah #user-table-body)
 	return c.Render(http.StatusOK, "user_list", map[string]interface{}{
-		"Users": users,
+		"Product": product,
 	})
 }
 
-func (u *Users) Delete(c echo.Context) error {
+func (u *Product) Delete(c echo.Context) error {
 	id := c.Param("id")
 
 	// Hapus data berdasarkan ID
@@ -112,7 +114,7 @@ func (u *Users) Delete(c echo.Context) error {
 	return c.NoContent(http.StatusOK)
 }
 
-func (u *Users) Edit(c echo.Context) error {
+func (u *Product) Edit(c echo.Context) error {
 	id := c.Param("id")
 	var user models.User
 	config.DB.First(&user, id)
@@ -121,7 +123,7 @@ func (u *Users) Edit(c echo.Context) error {
 	return c.Render(http.StatusOK, "user_edit_row", user)
 }
 
-func (u *Users) Row(c echo.Context) error {
+func (u *Product) Row(c echo.Context) error {
 	id := c.Param("id")
 	var user models.User
 	config.DB.First(&user, id)
@@ -130,7 +132,7 @@ func (u *Users) Row(c echo.Context) error {
 	return c.Render(http.StatusOK, "user_row_only", user)
 }
 
-func (u *Users) Update(c echo.Context) error {
+func (u *Product) Update(c echo.Context) error {
 	id := c.Param("id")
 
 	var user models.User
@@ -140,7 +142,8 @@ func (u *Users) Update(c echo.Context) error {
 	}
 
 	// Update field
-	user.Name = c.FormValue("name")
+	firstName := c.FormValue("name")
+	user.FirstName = &firstName
 	user.Email = c.FormValue("email")
 
 	config.DB.Save(&user)
@@ -149,7 +152,7 @@ func (u *Users) Update(c echo.Context) error {
 	return c.Render(http.StatusOK, "user_row_only", user)
 }
 
-func (u *Users) Detail(c echo.Context) error {
+func (u *Product) Detail(c echo.Context) error {
 	return c.String(http.StatusOK, "Detail user")
 }
 

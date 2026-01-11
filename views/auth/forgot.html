@@ -1,0 +1,32 @@
+{{define "auth/forgot"}}
+    {{template "auth/layout" .}}
+{{end}}
+
+{{define "auth-content"}}
+<div class="container">
+    <h1>Lupa Password</h1>
+    <p class="subtitle">Masukkan email Anda untuk menerima link reset password</p>
+
+    {{if .Error}}
+    <div class="error">{{.Error}}</div>
+    {{end}}
+
+    {{if .Success}}
+    <div class="success">{{.Success}}</div>
+    {{else}}
+
+    <form method="POST" action="/auth/doforgot">
+        <div class="form-group">
+            <label for="email">Email</label>
+            <input type="email" id="email" name="email" value="{{.Values.Email}}" required>
+        </div>
+
+        <button type="submit">Kirim Link Reset</button>
+    </form>
+    {{end}}
+
+    <div class="links">
+        <a href="/auth/login">← Kembali ke Login</a>
+    </div>
+</div>
+{{end}}

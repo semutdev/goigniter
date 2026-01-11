@@ -29,7 +29,6 @@ func buildDSN() string {
 	password := os.Getenv("DB_PASSWORD")
 	name := getEnv("DB_NAME", "goigniter")
 
-	// Format: user:password@tcp(host:port)/dbname?charset=utf8mb4&parseTime=True&loc=Local
 	return fmt.Sprintf("%s:%s@tcp(%s:%s)/%s?charset=utf8mb4&parseTime=True&loc=Local",
 		user, password, host, port, name)
 }

@@ -1,0 +1,52 @@
+{{define "auth/register"}}
+    {{template "auth/layout" .}}
+{{end}}
+
+{{define "auth-content"}}
+<div class="container" style="max-width: 450px;">
+    <h1>Daftar Akun</h1>
+
+    {{if .Error}}
+    <div class="error">{{.Error}}</div>
+    {{end}}
+
+    {{if .Success}}
+    <div class="success">{{.Success}}</div>
+    {{else}}
+
+    <form method="POST" action="/auth/doregister">
+        <div class="form-row">
+            <div class="form-group">
+                <label for="first_name">Nama Depan</label>
+                <input type="text" id="first_name" name="first_name" value="{{.Values.FirstName}}" required>
+            </div>
+            <div class="form-group">
+                <label for="last_name">Nama Belakang</label>
+                <input type="text" id="last_name" name="last_name" value="{{.Values.LastName}}" required>
+            </div>
+        </div>
+
+        <div class="form-group">
+            <label for="email">Email</label>
+            <input type="email" id="email" name="email" value="{{.Values.Email}}" required>
+        </div>
+
+        <div class="form-group">
+            <label for="password">Password (min 6 karakter)</label>
+            <input type="password" id="password" name="password" required>
+        </div>
+
+        <div class="form-group">
+            <label for="password_confirm">Konfirmasi Password</label>
+            <input type="password" id="password_confirm" name="password_confirm" required>
+        </div>
+
+        <button type="submit">Daftar</button>
+    </form>
+    {{end}}
+
+    <div class="links">
+        Sudah punya akun? <a href="/auth/login">Login</a>
+    </div>
+</div>
+{{end}}

@@ -3,12 +3,16 @@ package main
 import (
 	"fmt"
 	"goigniter/config"
-	_ "goigniter/controllers" // auto-register semua controller via init()
+	_ "goigniter/controllers"
+	_ "goigniter/controllers/admin"
+	"goigniter/database"
 	"goigniter/libs"
 	"goigniter/models"
 	"io"
 	"net/http"
 	"os"
+	"path/filepath"
+	"strings"
 	"text/template"
 
 	"github.com/go-playground/validator/v10"
@@ -18,11 +22,33 @@ import (
 )
 
 type Template struct {
-	templates *template.Template
+	viewsDir string
 }
 
 func (t *Template) Render(w io.Writer, name string, data interface{}, c echo.Context) error {
-	return t.templates.ExecuteTemplate(w, name, data)
+	// Cek apakah template ada di subfolder (misal: auth/login)
+	parts := strings.Split(name, "/")
+
+	if len(parts) == 2 {
+		// Template dengan layout (subfolder)
+		folder := parts[0]
+		layoutPath := filepath.Join(t.viewsDir, folder, "layout.html")
+		pagePath := filepath.Join(t.viewsDir, folder, parts[1]+".html")
+
+		// Cek apakah layout exists
+		if _, err := os.Stat(layoutPath); err == nil {
+			// Parse layout + page bersama
+			tmpl, err := template.ParseFiles(layoutPath, pagePath)
+			if err != nil {
+				return err
+			}
+			return tmpl.ExecuteTemplate(w, name, data)
+		}
+	}
+
+	// Fallback: parse semua template
+	tmpl := parseTemplates(t.viewsDir)
+	return tmpl.ExecuteTemplate(w, name, data)
 }
 
 type CustomValidator struct {
@@ -33,6 +59,43 @@ func (cv *CustomValidator) Validate(i interface{}) error {
 	return cv.validator.Struct(i)
 }
 
+// parseTemplates parse semua template termasuk subfolder
+func parseTemplates(viewsDir string) *template.Template {
+	tmpl := template.New("")
+
+	err := filepath.Walk(viewsDir, func(path string, info os.FileInfo, err error) error {
+		if err != nil {
+			return err
+		}
+
+		// Skip directory
+		if info.IsDir() {
+			return nil
+		}
+
+		// Hanya parse file .html
+		if !strings.HasSuffix(path, ".html") {
+			return nil
+		}
+
+		// Baca file
+		content, err := os.ReadFile(path)
+		if err != nil {
+			return err
+		}
+
+		// Parse template
+		_, err = tmpl.Parse(string(content))
+		return err
+	})
+
+	if err != nil {
+		panic("Error parsing templates: " + err.Error())
+	}
+
+	return tmpl
+}
+
 func main() {
 	// load env
 	godotenv.Load()
@@ -40,8 +103,17 @@ func main() {
 	// connect to DB
 	config.ConnectDB()
 
-	// auto create table
-	config.DB.AutoMigrate(&models.User{})
+	// auto migrate tables
+	config.DB.AutoMigrate(
+		&models.User{},
+		&models.Group{},
+		&models.LoginAttempt{},
+	)
+
+	// run seeder jika DB_SEED=true
+	if os.Getenv("DB_SEED") == "true" {
+		database.Seed(config.DB)
+	}
 
 	e := echo.New()
 	e.Debug = true
@@ -62,8 +134,9 @@ func main() {
 	e.Use(middleware.Recover())
 	e.Static("/static", "public")
 
+	// Setup template renderer dengan dukungan multi-layout
 	t := &Template{
-		templates: template.Must(template.ParseGlob("views/*.html")),
+		viewsDir: "views",
 	}
 	e.Renderer = t
 

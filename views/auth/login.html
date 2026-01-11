@@ -1,0 +1,43 @@
+{{define "auth/login"}}
+    {{template "auth/layout" .}}
+{{end}}
+
+{{define "auth-content"}}
+<div class="container">
+    <h1>Login</h1>
+
+    {{if .Error}}
+    <div class="error">{{.Error}}</div>
+    {{end}}
+
+    {{if .Success}}
+    <div class="success">{{.Success}}</div>
+    {{end}}
+
+    <form method="POST" action="/auth/dologin">
+        <div class="form-group">
+            <label for="email">Email</label>
+            <input type="email" id="email" name="email" value="{{.Values.Email}}" required>
+        </div>
+
+        <div class="form-group">
+            <label for="password">Password</label>
+            <input type="password" id="password" name="password" required>
+        </div>
+
+        <div class="form-group">
+            <label class="checkbox-group">
+                <input type="checkbox" name="remember" value="on">
+                Remember me
+            </label>
+        </div>
+
+        <button type="submit">Login</button>
+    </form>
+
+    <div class="links">
+        <a href="/auth/forgot">Lupa Password?</a> |
+        <a href="/auth/register">Daftar Akun Baru</a>
+    </div>
+</div>
+{{end}}

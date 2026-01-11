@@ -1,0 +1,37 @@
+{{define "auth/reset"}}
+    {{template "auth/layout" .}}
+{{end}}
+
+{{define "auth-content"}}
+<div class="container">
+    <h1>Reset Password</h1>
+    <p class="subtitle">Masukkan password baru Anda</p>
+
+    {{if .Error}}
+    <div class="error">{{.Error}}</div>
+    {{end}}
+
+    {{if .Success}}
+    <div class="success">{{.Success}}</div>
+    {{else}}
+
+    <form method="POST" action="/auth/doreset/{{.Selector}}/{{.Code}}">
+        <div class="form-group">
+            <label for="password">Password Baru (min 6 karakter)</label>
+            <input type="password" id="password" name="password" required>
+        </div>
+
+        <div class="form-group">
+            <label for="password_confirm">Konfirmasi Password</label>
+            <input type="password" id="password_confirm" name="password_confirm" required>
+        </div>
+
+        <button type="submit">Reset Password</button>
+    </form>
+    {{end}}
+
+    <div class="links">
+        <a href="/auth/login">← Kembali ke Login</a>
+    </div>
+</div>
+{{end}}
