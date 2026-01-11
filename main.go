@@ -51,7 +51,6 @@ func main() {
 		LogURI:    true,
 		LogMethod: true,
 		LogValuesFunc: func(c echo.Context, v middleware.RequestLoggerValues) error {
-			// Ini akan mencetak log ke terminal: "GET / 200"
 			fmt.Printf("[%s] %s status=%d\n", v.Method, v.URI, v.Status)
 			return nil
 		},
@@ -68,18 +67,11 @@ func main() {
 	}
 	e.Renderer = t
 
-	// e.GET("/", controllers.Index)
-	// e.POST("/users/add", controllers.Store)
-	// e.DELETE("/users/delete/:id", controllers.Delete)
-	// e.GET("/users/edit/:id", controllers.EditForm)
-	// e.GET("/users/row/:id", controllers.GetRow)
-	// e.PUT("/users/update/:id", controllers.Update)
-
-	// Auto-route: semua controller sudah ter-register via init()
 	libs.AutoRoute(e, libs.GetRegistry())
 
+	// default route
 	e.GET("/", func(c echo.Context) error {
-		return c.Redirect(http.StatusTemporaryRedirect, "/users/index")
+		return c.Redirect(http.StatusTemporaryRedirect, "/welcome")
 	})
 
 	port := os.Getenv("APP_PORT")
