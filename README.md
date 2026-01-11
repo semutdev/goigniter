@@ -1,0 +1,135 @@
+# GoIgniter <img src="data:image/png;base64,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" alt="GoIgniter" height="30">
+
+Go web framework dengan ruh CodeIgniter 3.
+
+## Fitur
+
+- **Auto-routing** - Buat controller, langsung bisa diakses di browser
+- **Self-registration** - Controller register otomatis via `init()`
+- **Nested folders** - Subfolder jadi URL prefix (`admin/dashboard` → `/admin/dashboard/index`)
+- **Default index** - `/users` otomatis panggil `Users.Index()`
+- **Auto parameter injection** - Method bisa terima `id` langsung atau via `c.Param("id")`
+- **HTTP method restriction** - Optional, untuk API yang butuh strict method
+
+## Quick Start
+
+```bash
+# Clone & setup
+git clone <repo>
+cd goigniter
+cp .env.example .env  # edit DB_DSN
+
+# Run
+go run main.go
+```
+
+Buka http://localhost:6789
+
+## Membuat Controller
+
+```go
+// controllers/products.go
+package controllers
+
+import (
+    "goigniter/libs"
+    "github.com/labstack/echo/v4"
+)
+
+func init() {
+    libs.Register("products", &Products{})
+}
+
+type Products struct{}
+
+func (p *Products) Index(c echo.Context) error {
+    return c.String(200, "Product list")
+}
+
+func (p *Products) Detail(c echo.Context, id int) error {
+    return c.String(200, fmt.Sprintf("Product #%d", id))
+}
+```
+
+URL mapping:
+- `/products` → `Products.Index()`
+- `/products/detail/5` → `Products.Detail(5)`
+
+## Controller dengan Subfolder
+
+```go
+// controllers/admin/dashboard.go
+package admin
+
+import "goigniter/libs"
+
+func init() {
+    libs.Register("admin/dashboard", &Dashboard{})
+}
+
+type Dashboard struct{}
+
+func (d *Dashboard) Index(c echo.Context) error {
+    return c.String(200, "Admin Dashboard")
+}
+```
+
+Tambahkan import di `main.go`:
+```go
+import (
+    _ "goigniter/controllers"
+    _ "goigniter/controllers/admin"  // tambah ini
+)
+```
+
+URL: `/admin/dashboard` → `Dashboard.Index()`
+
+## HTTP Method Restriction (untuk API)
+
+```go
+type Users struct{}
+
+func (u *Users) AllowedMethods() map[string][]string {
+    return map[string][]string{
+        "Index":  {"GET"},
+        "Add":    {"POST"},
+        "Update": {"PUT", "PATCH"},
+        "Delete": {"DELETE"},
+    }
+}
+```
+
+## Struktur Folder
+
+```
+goigniter/
+├── config/
+│   └── database.go      # Koneksi database (GORM)
+├── controllers/
+│   ├── init.go          # Package init
+│   └── users.go         # Controller users
+├── libs/
+│   ├── autoroute.go     # Auto-routing engine
+│   ├── interfaces.go    # Interface definitions
+│   └── registry.go      # Controller registry
+├── models/
+│   └── user.go          # GORM models
+├── views/
+│   └── *.html           # Go templates
+├── public/              # Static files
+├── main.go
+└── .env
+```
+
+## Environment Variables
+
+| Variable | Description | Default |
+|----------|-------------|---------|
+| `DB_DSN` | MySQL connection string | - |
+| `APP_PORT` | Server port | `:6789` |
+
+## Tech Stack
+
+- [Echo](https://echo.labstack.com/) - Web framework
+- [GORM](https://gorm.io/) - ORM
+- [HTMX](https://htmx.org/) - Frontend interactivity

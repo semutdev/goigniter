@@ -1,0 +1,33 @@
+{{define "layout"}}
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <title>{{ .Title }}</title>
+    <script src="https://unpkg.com/htmx.org@1.9.6"></script>
+    <script>
+        document.body.addEventListener('htmx:beforeSwap', function(evt) {
+            // Jika statusnya 422 (Unprocessable Entity)
+            if (evt.detail.xhr.status === 422) {
+                // Izinkan swap (ganti tampilan)
+                evt.detail.shouldSwap = true;
+                
+                // Set isError ke false agar htmx tidak memanggil event error
+                evt.detail.isError = false;
+            }
+        });
+    </script>
+    <style>
+        body { font-family: sans-serif; padding: 20px; }
+        .table { width: 100%; border-collapse: collapse; margin-top: 20px;}
+        .table th, .table td { border: 1px solid #ddd; padding: 8px; }
+    </style>
+</head>
+<body>
+    <h1>Welcome to GoIgniter <img src="data:image/png;base64,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" alt="fire-element--v1"> </h1>
+    
+    {{template "content" .}}
+
+</body>
+</html>
+{{end}}

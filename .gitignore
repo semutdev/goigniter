@@ -1,0 +1,5 @@
+.env
+goigniter
+/bin
+/vendor
+CLAUDE.md
