@@ -3,13 +3,29 @@ package libs
 import (
 	"os"
 	"strings"
+	"sync"
 	"text/template"
 
 	"github.com/gorilla/sessions"
 	"github.com/labstack/echo/v4"
 )
 
-var store = sessions.NewCookieStore([]byte(os.Getenv("APP_KEY")))
+var (
+	store     *sessions.CookieStore
+	storeOnce sync.Once
+)
+
+// getStore returns session store, initialized lazily
+func getStore() *sessions.CookieStore {
+	storeOnce.Do(func() {
+		key := os.Getenv("APP_KEY")
+		if key == "" {
+			key = "goigniter-default-secret-key-32"
+		}
+		store = sessions.NewCookieStore([]byte(key))
+	})
+	return store
+}
 
 // BaseURL returns the base URL from APP_URL env
 func BaseURL(path ...string) string {
@@ -41,14 +57,14 @@ func SiteURL(path ...string) string {
 
 // SetFlash sets a flash message in session
 func SetFlash(c echo.Context, key string, value string) {
-	session, _ := store.Get(c.Request(), "flash")
+	session, _ := getStore().Get(c.Request(), "flash")
 	session.AddFlash(value, key)
 	session.Save(c.Request(), c.Response())
 }
 
 // GetFlash gets and removes a flash message from session
 func GetFlash(c echo.Context, key string) string {
-	session, _ := store.Get(c.Request(), "flash")
+	session, _ := getStore().Get(c.Request(), "flash")
 	flashes := session.Flashes(key)
 	session.Save(c.Request(), c.Response())
 
