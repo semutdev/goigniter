@@ -1,0 +1,160 @@
+{{define "admin/product/index"}}
+    {{template "admin/layout" .}}
+{{end}}
+
+{{define "admin-content"}}
+<div class="d-flex justify-content-between flex-wrap flex-md-nowrap align-items-center pt-3 pb-2 mb-3 border-bottom">
+    <h1 class="h2">{{ .Title }}</h1>
+    <a href="{{site_url "admin/product/add"}}" class="btn btn-primary">
+        <i class="bi bi-plus-lg"></i> Tambah Product
+    </a>
+</div>
+
+{{if .Success}}
+<div class="alert alert-success alert-dismissible fade show" role="alert">
+    {{.Success}}
+    <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
+</div>
+{{end}}
+
+{{if .Error}}
+<div class="alert alert-danger alert-dismissible fade show" role="alert">
+    {{.Error}}
+    <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
+</div>
+{{end}}
+
+<div class="card">
+    <div class="card-body">
+        <table id="productTable" class="table table-striped table-hover" style="width:100%">
+            <thead>
+                <tr>
+                    <th>ID</th>
+                    <th>Nama</th>
+                    <th>Harga</th>
+                    <th>Stock</th>
+                    <th>Created At</th>
+                    <th>Actions</th>
+                </tr>
+            </thead>
+            <tbody>
+            </tbody>
+        </table>
+    </div>
+</div>
+
+<!-- Delete Confirmation Modal -->
+<div class="modal fade" id="deleteModal" tabindex="-1">
+    <div class="modal-dialog">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title">Konfirmasi Hapus</h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+            </div>
+            <div class="modal-body">
+                <p>Apakah Anda yakin ingin menghapus product <strong id="deleteProductName"></strong>?</p>
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Batal</button>
+                <button type="button" class="btn btn-danger" id="confirmDelete">Hapus</button>
+            </div>
+        </div>
+    </div>
+</div>
+{{end}}
+
+{{define "admin-scripts"}}
+<script>
+$(document).ready(function() {
+    var table = $('#productTable').DataTable({
+        processing: true,
+        serverSide: true,
+        ajax: {
+            url: '{{site_url "admin/product/data"}}',
+            type: 'GET'
+        },
+        columns: [
+            { data: 'id' },
+            { data: 'name' },
+            {
+                data: 'price',
+                render: function(data) {
+                    return 'Rp ' + new Intl.NumberFormat('id-ID').format(data);
+                }
+            },
+            { data: 'stock' },
+            {
+                data: 'created_at',
+                render: function(data) {
+                    return new Date(data).toLocaleDateString('id-ID');
+                }
+            },
+            {
+                data: null,
+                orderable: false,
+                render: function(data, type, row) {
+                    return `
+                        <a href="{{site_url "admin/product/edit/"}}${row.id}" class="btn btn-sm btn-warning">
+                            <i class="bi bi-pencil"></i>
+                        </a>
+                        <button class="btn btn-sm btn-danger btn-delete" data-id="${row.id}" data-name="${row.name}">
+                            <i class="bi bi-trash"></i>
+                        </button>
+                    `;
+                }
+            }
+        ],
+        order: [[0, 'desc']],
+        language: {
+            processing: "Memuat...",
+            search: "Cari:",
+            lengthMenu: "Tampilkan _MENU_ data",
+            info: "Menampilkan _START_ - _END_ dari _TOTAL_ data",
+            infoEmpty: "Tidak ada data",
+            infoFiltered: "(disaring dari _MAX_ total data)",
+            paginate: {
+                first: "Pertama",
+                last: "Terakhir",
+                next: "Selanjutnya",
+                previous: "Sebelumnya"
+            }
+        }
+    });
+
+    // Delete button handler
+    var deleteId = null;
+    var deleteModal = new bootstrap.Modal(document.getElementById('deleteModal'));
+
+    $('#productTable').on('click', '.btn-delete', function() {
+        deleteId = $(this).data('id');
+        $('#deleteProductName').text($(this).data('name'));
+        deleteModal.show();
+    });
+
+    $('#confirmDelete').on('click', function() {
+        if (deleteId) {
+            $.ajax({
+                url: '{{site_url "admin/product/delete/"}}' + deleteId,
+                type: 'DELETE',
+                success: function(response) {
+                    deleteModal.hide();
+                    table.ajax.reload();
+                    // Show success alert
+                    var alertHtml = `
+                        <div class="alert alert-success alert-dismissible fade show" role="alert">
+                            Product berhasil dihapus
+                            <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
+                        </div>
+                    `;
+                    $('.border-bottom').after(alertHtml);
+                },
+                error: function(xhr) {
+                    deleteModal.hide();
+                    alert('Gagal menghapus product');
+                }
+            });
+        }
+    });
+});
+</script>
+{{end}}

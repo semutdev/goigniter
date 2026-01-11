@@ -26,19 +26,27 @@ type Template struct {
 }
 
 func (t *Template) Render(w io.Writer, name string, data interface{}, c echo.Context) error {
-	// Cek apakah template ada di subfolder (misal: auth/login)
+	// Cek apakah template ada di subfolder (misal: auth/login atau admin/product/index)
 	parts := strings.Split(name, "/")
 
-	if len(parts) == 2 {
+	if len(parts) >= 2 {
 		// Template dengan layout (subfolder)
 		folder := parts[0]
 		layoutPath := filepath.Join(t.viewsDir, folder, "layout.html")
-		pagePath := filepath.Join(t.viewsDir, folder, parts[1]+".html")
+		var pagePath string
+
+		if len(parts) == 2 {
+			// auth/login -> views/auth/login.html
+			pagePath = filepath.Join(t.viewsDir, folder, parts[1]+".html")
+		} else if len(parts) == 3 {
+			// admin/product/index -> views/admin/product/index.html
+			pagePath = filepath.Join(t.viewsDir, folder, parts[1], parts[2]+".html")
+		}
 
 		// Cek apakah layout exists
 		if _, err := os.Stat(layoutPath); err == nil {
-			// Parse layout + page bersama
-			tmpl, err := template.ParseFiles(layoutPath, pagePath)
+			// Parse layout + page bersama dengan FuncMap
+			tmpl, err := template.New("").Funcs(libs.TemplateFuncs()).ParseFiles(layoutPath, pagePath)
 			if err != nil {
 				return err
 			}
@@ -46,7 +54,7 @@ func (t *Template) Render(w io.Writer, name string, data interface{}, c echo.Con
 		}
 	}
 
-	// Fallback: parse semua template
+	// Fallback: parse semua template dengan FuncMap
 	tmpl := parseTemplates(t.viewsDir)
 	return tmpl.ExecuteTemplate(w, name, data)
 }
@@ -61,7 +69,7 @@ func (cv *CustomValidator) Validate(i interface{}) error {
 
 // parseTemplates parse semua template termasuk subfolder
 func parseTemplates(viewsDir string) *template.Template {
-	tmpl := template.New("")
+	tmpl := template.New("").Funcs(libs.TemplateFuncs())
 
 	err := filepath.Walk(viewsDir, func(path string, info os.FileInfo, err error) error {
 		if err != nil {
@@ -108,6 +116,7 @@ func main() {
 		&models.User{},
 		&models.Group{},
 		&models.LoginAttempt{},
+		&models.Product{},
 	)
 
 	// run seeder jika DB_SEED=true

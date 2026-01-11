@@ -4,174 +4,294 @@ import (
 	"goigniter/config"
 	"goigniter/libs"
 	"goigniter/models"
+	"math"
 	"net/http"
-	"time"
+	"strconv"
 
-	"github.com/go-playground/validator/v10"
 	"github.com/labstack/echo/v4"
 )
 
 func init() {
-	libs.Register("product", &Product{})
-}
-
-type UserForm struct {
-	Name  string `form:"name" validate:"required,min=3"`
-	Email string `form:"email" validate:"required,email"`
+	libs.Register("admin/product", &Product{})
 }
 
 type Product struct{}
 
-func (u *Product) Index(c echo.Context) error {
-	var product []models.User
-	result := config.DB.Order("created_at desc").Find(&product)
+type ProductForm struct {
+	Name  string  `form:"name" validate:"required,min=3"`
+	Price float64 `form:"price" validate:"required,gt=0"`
+	Stock int     `form:"stock" validate:"gte=0"`
+}
 
-	if result.Error != nil {
-		return c.String(http.StatusInternalServerError, "Database Error")
+// DataTablesRequest untuk server-side processing
+type DataTablesRequest struct {
+	Draw   int    `query:"draw"`
+	Start  int    `query:"start"`
+	Length int    `query:"length"`
+	Search string `query:"search[value]"`
+	Order  string `query:"order[0][column]"`
+	Dir    string `query:"order[0][dir]"`
+}
+
+// DataTablesResponse format response untuk DataTables
+type DataTablesResponse struct {
+	Draw            int                `json:"draw"`
+	RecordsTotal    int64              `json:"recordsTotal"`
+	RecordsFiltered int64              `json:"recordsFiltered"`
+	Data            []models.Product   `json:"data"`
+}
+
+// Index menampilkan halaman list product dengan DataTables
+func (p *Product) Index(c echo.Context) error {
+	// Cek auth
+	if !libs.IsLoggedIn(c) {
+		return c.Redirect(http.StatusSeeOther, "/auth/login")
 	}
 
-	// send data to view
 	data := map[string]interface{}{
-		"Title":   "User Management",
-		"Product": product,
-		"Values":  UserForm{},
-		"Errors":  map[string]string{},
+		"Title":   "Product Management",
+		"Success": libs.GetFlash(c, "success"),
+		"Error":   libs.GetFlash(c, "error"),
 	}
 
-	return c.Render(http.StatusOK, "index", data)
+	return c.Render(http.StatusOK, "admin/product/index", data)
 }
 
-func (u *Product) Add(c echo.Context) error {
-	form := new(UserForm)
+// Data mengembalikan JSON untuk DataTables server-side
+func (p *Product) Data(c echo.Context) error {
+	// Cek auth
+	if !libs.IsLoggedIn(c) {
+		return c.JSON(http.StatusUnauthorized, map[string]string{"error": "Unauthorized"})
+	}
 
-	// 1. Tangkap Input
+	// Parse parameters
+	draw, _ := strconv.Atoi(c.QueryParam("draw"))
+	start, _ := strconv.Atoi(c.QueryParam("start"))
+	length, _ := strconv.Atoi(c.QueryParam("length"))
+	search := c.QueryParam("search[value]")
+	orderCol := c.QueryParam("order[0][column]")
+	orderDir := c.QueryParam("order[0][dir]")
+
+	// Default values
+	if length <= 0 {
+		length = 10
+	}
+	if orderDir == "" {
+		orderDir = "asc"
+	}
+
+	// Column mapping
+	columns := map[string]string{
+		"0": "id",
+		"1": "name",
+		"2": "price",
+		"3": "stock",
+		"4": "created_at",
+	}
+
+	orderColumn := columns[orderCol]
+	if orderColumn == "" {
+		orderColumn = "id"
+	}
+
+	// Query builder
+	var products []models.Product
+	var totalRecords int64
+	var filteredRecords int64
+
+	// Count total records
+	config.DB.Model(&models.Product{}).Count(&totalRecords)
+
+	// Build query with search
+	query := config.DB.Model(&models.Product{})
+	if search != "" {
+		query = query.Where("name LIKE ?", "%"+search+"%")
+	}
+
+	// Count filtered records
+	query.Count(&filteredRecords)
+
+	// Get data with pagination and ordering
+	query.Order(orderColumn + " " + orderDir).
+		Offset(start).
+		Limit(length).
+		Find(&products)
+
+	// Response
+	response := DataTablesResponse{
+		Draw:            draw,
+		RecordsTotal:    totalRecords,
+		RecordsFiltered: filteredRecords,
+		Data:            products,
+	}
+
+	return c.JSON(http.StatusOK, response)
+}
+
+// Add menampilkan form tambah product
+func (p *Product) Add(c echo.Context) error {
+	if !libs.IsLoggedIn(c) {
+		return c.Redirect(http.StatusSeeOther, "/auth/login")
+	}
+
+	data := map[string]interface{}{
+		"Title":  "Tambah Product",
+		"Values": ProductForm{},
+		"Errors": map[string]string{},
+	}
+
+	return c.Render(http.StatusOK, "admin/product/add", data)
+}
+
+// Store menyimpan product baru
+func (p *Product) Store(c echo.Context) error {
+	if !libs.IsLoggedIn(c) {
+		return c.Redirect(http.StatusSeeOther, "/auth/login")
+	}
+
+	form := new(ProductForm)
 	if err := c.Bind(form); err != nil {
-		return c.String(http.StatusBadRequest, "Bad Request")
+		libs.SetFlash(c, "error", "Data tidak valid")
+		return c.Redirect(http.StatusSeeOther, "/admin/product/add")
 	}
 
-	// 2. Validasi ($this->form_validation->run())
 	if err := c.Validate(form); err != nil {
-		// JIKA VALIDASI GAGAL:
-
-		// Konversi error jadi map string
-		validationErrors := getValidationErrors(err)
-
-		// Siapkan data untuk dikirim balik ke View (Error + Old Value)
 		data := map[string]interface{}{
-			"Errors": validationErrors,
-			"Values": form, // Mengirim balik apa yang diinput user (set_value)
+			"Title":  "Tambah Product",
+			"Values": form,
+			"Errors": getProductValidationErrors(err),
 		}
-
-		// Trik HTMX: Kita suruh HTMX ganti targetnya.
-		// Awalnya form targetnya ke tabel (#user-table-body),
-		// tapi karena error, kita mau update form-nya saja (#form-container atau parent form)
-		// Cara paling gampang di kasus ini: return form-nya saja dengan status 422
-		// Dan di frontend kita perlu handle target (atau gunakan `hx-target-error` extension).
-
-		// Tapi cara paling simple tanpa extension:
-		// Kita ubah target via Header response
-		c.Response().Header().Set("HX-Retarget", "#form-container")
-		// Note: Pastikan div pembungkus form di index.html punya id="form-container"
-
-		return c.Render(http.StatusOK, "form_add", data)
+		return c.Render(http.StatusOK, "admin/product/add", data)
 	}
 
-	// 3. JIKA SUKSES
-	firstName := form.Name
-	newUser := models.User{
-		FirstName: &firstName,
-		Email:     form.Email,
-		CreatedOn: time.Now().Unix(),
-		Active:    true,
+	// Simpan ke database
+	product := models.Product{
+		Name:  form.Name,
+		Price: form.Price,
+		Stock: form.Stock,
+	}
+	config.DB.Create(&product)
+
+	libs.SetFlash(c, "success", "Product berhasil ditambahkan")
+	return c.Redirect(http.StatusSeeOther, "/admin/product")
+}
+
+// Edit menampilkan form edit product
+func (p *Product) Edit(c echo.Context) error {
+	if !libs.IsLoggedIn(c) {
+		return c.Redirect(http.StatusSeeOther, "/auth/login")
 	}
 
-	config.DB.Create(&newUser)
+	id := c.Param("id")
+	var product models.Product
+	if err := config.DB.First(&product, id).Error; err != nil {
+		libs.SetFlash(c, "error", "Product tidak ditemukan")
+		return c.Redirect(http.StatusSeeOther, "/admin/product")
+	}
 
-	c.Response().Header().Set("HX-Trigger", "reset-form")
-
-	// Ambil data terbaru
-	var product []models.User
-	config.DB.Order("created_at desc").Find(&product)
-
-	// Render tabelnya (Target asli form adalah #user-table-body)
-	return c.Render(http.StatusOK, "user_list", map[string]interface{}{
+	data := map[string]interface{}{
+		"Title":   "Edit Product",
 		"Product": product,
-	})
-}
-
-func (u *Product) Delete(c echo.Context) error {
-	id := c.Param("id")
-
-	// Hapus data berdasarkan ID
-	// Unscoped() digunakan agar benar-benar terhapus (hard delete)
-	// Kalau mau soft delete (gorm.DeletedAt), hapus .Unscoped() nya
-	if err := config.DB.Unscoped().Delete(&models.User{}, id).Error; err != nil {
-		return c.String(http.StatusInternalServerError, "Gagal menghapus")
+		"Values": ProductForm{
+			Name:  product.Name,
+			Price: product.Price,
+			Stock: product.Stock,
+		},
+		"Errors": map[string]string{},
 	}
 
-	// Return 200 OK dengan string kosong.
-	// HTMX akan menerima ini dan menghapus elemen <tr> di HTML.
-	return c.NoContent(http.StatusOK)
+	return c.Render(http.StatusOK, "admin/product/edit", data)
 }
 
-func (u *Product) Edit(c echo.Context) error {
-	id := c.Param("id")
-	var user models.User
-	config.DB.First(&user, id)
-
-	// Render file "user_edit_row.html"
-	return c.Render(http.StatusOK, "user_edit_row", user)
-}
-
-func (u *Product) Row(c echo.Context) error {
-	id := c.Param("id")
-	var user models.User
-	config.DB.First(&user, id)
-
-	// Render potongan template "user_row_only" yang ada di user_list.html
-	return c.Render(http.StatusOK, "user_row_only", user)
-}
-
-func (u *Product) Update(c echo.Context) error {
-	id := c.Param("id")
-
-	var user models.User
-	// Cari user dulu
-	if err := config.DB.First(&user, id).Error; err != nil {
-		return c.String(http.StatusNotFound, "User not found")
+// Update menyimpan perubahan product
+func (p *Product) Update(c echo.Context) error {
+	if !libs.IsLoggedIn(c) {
+		return c.Redirect(http.StatusSeeOther, "/auth/login")
 	}
 
-	// Update field
-	firstName := c.FormValue("name")
-	user.FirstName = &firstName
-	user.Email = c.FormValue("email")
+	id := c.Param("id")
+	var product models.Product
+	if err := config.DB.First(&product, id).Error; err != nil {
+		libs.SetFlash(c, "error", "Product tidak ditemukan")
+		return c.Redirect(http.StatusSeeOther, "/admin/product")
+	}
 
-	config.DB.Save(&user)
+	form := new(ProductForm)
+	if err := c.Bind(form); err != nil {
+		libs.SetFlash(c, "error", "Data tidak valid")
+		return c.Redirect(http.StatusSeeOther, "/admin/product/edit/"+id)
+	}
 
-	// Setelah save, kembalikan tampilan menjadi baris tabel biasa
-	return c.Render(http.StatusOK, "user_row_only", user)
+	if err := c.Validate(form); err != nil {
+		data := map[string]interface{}{
+			"Title":   "Edit Product",
+			"Product": product,
+			"Values":  form,
+			"Errors":  getProductValidationErrors(err),
+		}
+		return c.Render(http.StatusOK, "admin/product/edit", data)
+	}
+
+	// Update database
+	product.Name = form.Name
+	product.Price = form.Price
+	product.Stock = form.Stock
+	config.DB.Save(&product)
+
+	libs.SetFlash(c, "success", "Product berhasil diupdate")
+	return c.Redirect(http.StatusSeeOther, "/admin/product")
 }
 
-func (u *Product) Detail(c echo.Context) error {
-	return c.String(http.StatusOK, "Detail user")
+// Delete menghapus product
+func (p *Product) Delete(c echo.Context) error {
+	if !libs.IsLoggedIn(c) {
+		return c.JSON(http.StatusUnauthorized, map[string]string{"error": "Unauthorized"})
+	}
+
+	id := c.Param("id")
+	if err := config.DB.Delete(&models.Product{}, id).Error; err != nil {
+		return c.JSON(http.StatusInternalServerError, map[string]string{"error": "Gagal menghapus product"})
+	}
+
+	return c.JSON(http.StatusOK, map[string]string{"message": "Product berhasil dihapus"})
 }
 
-func getValidationErrors(err error) map[string]string {
+// Helper untuk format harga
+func formatPrice(price float64) string {
+	return strconv.FormatFloat(math.Round(price*100)/100, 'f', 0, 64)
+}
+
+func getProductValidationErrors(err error) map[string]string {
 	errors := make(map[string]string)
-	if validationErrors, ok := err.(validator.ValidationErrors); ok {
-		for _, fieldError := range validationErrors {
-			// Custom pesan error ala CI3
-			switch fieldError.Tag() {
-			case "required":
-				errors[fieldError.Field()] = "Field ini wajib diisi bro"
-			case "email":
-				errors[fieldError.Field()] = "Format email salah"
-			case "min":
-				errors[fieldError.Field()] = "Minimal " + fieldError.Param() + " karakter"
-			default:
-				errors[fieldError.Field()] = "Error validasi"
-			}
+	if validationErrors, ok := err.(interface{ Field() string }); ok {
+		_ = validationErrors
+	}
+
+	// Simple error extraction
+	if err != nil {
+		errStr := err.Error()
+		if contains(errStr, "Name") {
+			errors["Name"] = "Nama product wajib diisi (min 3 karakter)"
+		}
+		if contains(errStr, "Price") {
+			errors["Price"] = "Harga harus lebih dari 0"
+		}
+		if contains(errStr, "Stock") {
+			errors["Stock"] = "Stock tidak boleh negatif"
 		}
 	}
 	return errors
+}
+
+func contains(s, substr string) bool {
+	return len(s) >= len(substr) && (s == substr || len(s) > 0 && containsRune(s, substr))
+}
+
+func containsRune(s, substr string) bool {
+	for i := 0; i <= len(s)-len(substr); i++ {
+		if s[i:i+len(substr)] == substr {
+			return true
+		}
+	}
+	return false
 }

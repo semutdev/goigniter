@@ -2,4 +2,6 @@
 goigniter
 /bin
 /vendor
+/tmp
+build-errors.log
 CLAUDE.md

@@ -1,0 +1,59 @@
+{{define "admin/product/edit"}}
+    {{template "admin/layout" .}}
+{{end}}
+
+{{define "admin-content"}}
+<div class="d-flex justify-content-between flex-wrap flex-md-nowrap align-items-center pt-3 pb-2 mb-3 border-bottom">
+    <h1 class="h2">{{ .Title }}</h1>
+    <a href="{{site_url "admin/product"}}" class="btn btn-secondary">
+        <i class="bi bi-arrow-left"></i> Kembali
+    </a>
+</div>
+
+<div class="row">
+    <div class="col-md-6">
+        <div class="card">
+            <div class="card-body">
+                <form method="POST" action="{{site_url "admin/product/update/"}}{{.Product.ID}}">
+                    <div class="mb-3">
+                        <label for="name" class="form-label">Nama Product</label>
+                        <input type="text" class="form-control {{if .Errors.Name}}is-invalid{{end}}"
+                            id="name" name="name" value="{{.Values.Name}}" required>
+                        {{if .Errors.Name}}
+                        <div class="invalid-feedback">{{.Errors.Name}}</div>
+                        {{end}}
+                    </div>
+
+                    <div class="mb-3">
+                        <label for="price" class="form-label">Harga</label>
+                        <div class="input-group">
+                            <span class="input-group-text">Rp</span>
+                            <input type="number" class="form-control {{if .Errors.Price}}is-invalid{{end}}"
+                                id="price" name="price" value="{{.Values.Price}}" min="0" step="1000" required>
+                            {{if .Errors.Price}}
+                            <div class="invalid-feedback">{{.Errors.Price}}</div>
+                            {{end}}
+                        </div>
+                    </div>
+
+                    <div class="mb-3">
+                        <label for="stock" class="form-label">Stock</label>
+                        <input type="number" class="form-control {{if .Errors.Stock}}is-invalid{{end}}"
+                            id="stock" name="stock" value="{{.Values.Stock}}" min="0" required>
+                        {{if .Errors.Stock}}
+                        <div class="invalid-feedback">{{.Errors.Stock}}</div>
+                        {{end}}
+                    </div>
+
+                    <div class="d-grid gap-2 d-md-flex justify-content-md-end">
+                        <a href="{{site_url "admin/product"}}" class="btn btn-secondary">Batal</a>
+                        <button type="submit" class="btn btn-primary">
+                            <i class="bi bi-save"></i> Update
+                        </button>
+                    </div>
+                </form>
+            </div>
+        </div>
+    </div>
+</div>
+{{end}}

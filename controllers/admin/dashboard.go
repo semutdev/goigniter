@@ -2,6 +2,7 @@ package admin
 
 import (
 	"goigniter/libs"
+	"net/http"
 
 	"github.com/labstack/echo/v4"
 )
@@ -13,9 +14,14 @@ func init() {
 }
 
 func (d *Dashboard) Index(c echo.Context) error {
-	// protectt dashboard harus login admin
+	// protect dashboard harus login admin
 	if !libs.RequireGroup(c, "admin") {
 		return nil
 	}
-	return c.String(200, "Admin Dashboard")
+
+	data := map[string]interface{}{
+		"Title": "Dashboard admin",
+	}
+
+	return c.Render(http.StatusOK, "admin/dashboard", data)
 }
