@@ -1,7 +1,7 @@
 package database
 
 import (
-	"goigniter/models"
+	"full-crud/application/models"
 	"log"
 	"time"
 

@@ -5,16 +5,16 @@ import (
 	"encoding/base64"
 	"encoding/json"
 	"errors"
-	"goigniter/config"
-	"goigniter/models"
+	"full-crud/application/models"
+	"full-crud/config"
 	"net/http"
 	"os"
 	"strings"
 	"time"
 
 	"github.com/golang-jwt/jwt/v5"
-	"github.com/labstack/echo/v4"
 	"golang.org/x/crypto/bcrypt"
+	"goigniter/system/core"
 )
 
 // Auth errors
@@ -46,29 +46,24 @@ type SessionData struct {
 func Login(identity, password, ipAddress string) (*models.User, error) {
 	var user models.User
 
-	// Cari user by email atau username
 	result := config.DB.Preload("Groups").
 		Where("email = ? OR username = ?", identity, identity).
 		First(&user)
 
 	if result.Error != nil {
-		// Log attempt
 		logLoginAttempt(ipAddress, identity)
 		return nil, ErrInvalidCredentials
 	}
 
-	// Cek password
 	if err := bcrypt.CompareHashAndPassword([]byte(user.Password), []byte(password)); err != nil {
 		logLoginAttempt(ipAddress, identity)
 		return nil, ErrInvalidCredentials
 	}
 
-	// Cek active
 	if !user.Active {
 		return nil, ErrUserNotActive
 	}
 
-	// Update last login
 	now := time.Now().Unix()
 	user.LastLogin = &now
 	user.IPAddress = ipAddress
@@ -79,13 +74,11 @@ func Login(identity, password, ipAddress string) (*models.User, error) {
 
 // RegisterUser membuat user baru
 func RegisterUser(email, password, firstName, lastName, ipAddress string) (*models.User, error) {
-	// Hash password
 	hashedPassword, err := bcrypt.GenerateFromPassword([]byte(password), bcrypt.DefaultCost)
 	if err != nil {
 		return nil, err
 	}
 
-	// Generate activation code
 	selector := generateToken(16)
 	code := generateToken(32)
 	hashedCode, _ := bcrypt.GenerateFromPassword([]byte(code), bcrypt.DefaultCost)
@@ -97,7 +90,7 @@ func RegisterUser(email, password, firstName, lastName, ipAddress string) (*mode
 		LastName:           &lastName,
 		IPAddress:          ipAddress,
 		CreatedOn:          time.Now().Unix(),
-		Active:             false, // Butuh aktivasi
+		Active:             false,
 		ActivationSelector: &selector,
 		ActivationCode:     stringPtr(string(hashedCode)),
 	}
@@ -106,7 +99,6 @@ func RegisterUser(email, password, firstName, lastName, ipAddress string) (*mode
 		return nil, err
 	}
 
-	// Assign ke group members
 	var membersGroup models.Group
 	config.DB.Where("name = ?", "members").First(&membersGroup)
 	config.DB.Model(&user).Association("Groups").Append(&membersGroup)
@@ -122,7 +114,6 @@ func Activate(selector, code string) error {
 		return ErrInvalidToken
 	}
 
-	// Verify code
 	if user.ActivationCode == nil {
 		return ErrInvalidToken
 	}
@@ -130,7 +121,6 @@ func Activate(selector, code string) error {
 		return ErrInvalidToken
 	}
 
-	// Activate user
 	user.Active = true
 	user.ActivationSelector = nil
 	user.ActivationCode = nil
@@ -139,7 +129,7 @@ func Activate(selector, code string) error {
 	return nil
 }
 
-// ForgotPassword generates reset token dan return selector:code untuk email
+// ForgotPassword generates reset token
 func ForgotPassword(email string) (string, string, error) {
 	var user models.User
 	result := config.DB.Where("email = ?", email).First(&user)
@@ -147,7 +137,6 @@ func ForgotPassword(email string) (string, string, error) {
 		return "", "", ErrUserNotFound
 	}
 
-	// Generate tokens
 	selector := generateToken(16)
 	code := generateToken(32)
 	hashedCode, _ := bcrypt.GenerateFromPassword([]byte(code), bcrypt.DefaultCost)
@@ -169,12 +158,10 @@ func ResetPassword(selector, code, newPassword string) error {
 		return ErrInvalidToken
 	}
 
-	// Cek expired (24 jam)
 	if user.ForgottenPasswordTime == nil || time.Now().Unix()-*user.ForgottenPasswordTime > 86400 {
 		return ErrInvalidToken
 	}
 
-	// Verify code
 	if user.ForgottenPasswordCode == nil {
 		return ErrInvalidToken
 	}
@@ -182,7 +169,6 @@ func ResetPassword(selector, code, newPassword string) error {
 		return ErrInvalidToken
 	}
 
-	// Update password
 	hashedPassword, _ := bcrypt.GenerateFromPassword([]byte(newPassword), bcrypt.DefaultCost)
 	user.Password = string(hashedPassword)
 	user.ForgottenPasswordSelector = nil
@@ -193,33 +179,13 @@ func ResetPassword(selector, code, newPassword string) error {
 	return nil
 }
 
-// UpdatePassword mengupdate password user
-func UpdatePassword(userID uint, oldPassword, newPassword string) error {
-	var user models.User
-	if err := config.DB.First(&user, userID).Error; err != nil {
-		return ErrUserNotFound
-	}
-
-	// Verify old password
-	if err := bcrypt.CompareHashAndPassword([]byte(user.Password), []byte(oldPassword)); err != nil {
-		return ErrPasswordMismatch
-	}
-
-	// Update password
-	hashedPassword, _ := bcrypt.GenerateFromPassword([]byte(newPassword), bcrypt.DefaultCost)
-	user.Password = string(hashedPassword)
-	config.DB.Save(&user)
-
-	return nil
-}
-
-// --- Session Functions (Web) ---
+// --- Session Functions (using core.Context) ---
 
 // SetSession menyimpan user session ke cookie
-func SetSession(c echo.Context, user *models.User, remember bool) error {
+func SetSession(c *core.Context, user *models.User, remember bool) error {
 	expiry := time.Now().Add(24 * time.Hour)
 	if remember {
-		expiry = time.Now().Add(30 * 24 * time.Hour) // 30 hari
+		expiry = time.Now().Add(30 * 24 * time.Hour)
 	}
 
 	sessionData := SessionData{
@@ -232,12 +198,12 @@ func SetSession(c echo.Context, user *models.User, remember bool) error {
 	encoded := base64.StdEncoding.EncodeToString(jsonData)
 
 	cookie := &http.Cookie{
-		Name:     "goigniter_session",
+		Name:     "goigniter_auth",
 		Value:    encoded,
 		Path:     "/",
 		Expires:  expiry,
 		HttpOnly: true,
-		Secure:   false, // Set true di production dengan HTTPS
+		Secure:   false,
 		SameSite: http.SameSiteLaxMode,
 	}
 	c.SetCookie(cookie)
@@ -246,8 +212,8 @@ func SetSession(c echo.Context, user *models.User, remember bool) error {
 }
 
 // GetSession mengambil user dari session cookie
-func GetSession(c echo.Context) *models.User {
-	cookie, err := c.Cookie("goigniter_session")
+func GetSession(c *core.Context) *models.User {
+	cookie, err := c.Cookie("goigniter_auth")
 	if err != nil {
 		return nil
 	}
@@ -262,7 +228,6 @@ func GetSession(c echo.Context) *models.User {
 		return nil
 	}
 
-	// Cek expired
 	if time.Now().Unix() > sessionData.ExpiresAt {
 		return nil
 	}
@@ -276,9 +241,9 @@ func GetSession(c echo.Context) *models.User {
 }
 
 // ClearSession menghapus session cookie
-func ClearSession(c echo.Context) {
+func ClearSession(c *core.Context) {
 	cookie := &http.Cookie{
-		Name:     "goigniter_session",
+		Name:     "goigniter_auth",
 		Value:    "",
 		Path:     "/",
 		Expires:  time.Unix(0, 0),
@@ -309,7 +274,7 @@ func GenerateJWT(user *models.User) (string, error) {
 	return token.SignedString([]byte(secret))
 }
 
-// ValidateJWT memvalidasi JWT token dan return user
+// ValidateJWT memvalidasi JWT token
 func ValidateJWT(tokenString string) (*models.User, error) {
 	secret := os.Getenv("JWT_SECRET")
 	if secret == "" {
@@ -339,15 +304,13 @@ func ValidateJWT(tokenString string) (*models.User, error) {
 
 // --- Helper Functions ---
 
-// GetUser mengambil user dari context (session atau JWT)
-func GetUser(c echo.Context) *models.User {
-	// Cek dari context dulu (sudah di-set middleware)
+// GetUser mengambil user dari context
+func GetUser(c *core.Context) *models.User {
 	if user, ok := c.Get("user").(*models.User); ok {
 		return user
 	}
 
-	// Cek JWT dari header
-	auth := c.Request().Header.Get("Authorization")
+	auth := c.Header("Authorization")
 	if strings.HasPrefix(auth, "Bearer ") {
 		token := strings.TrimPrefix(auth, "Bearer ")
 		if user, err := ValidateJWT(token); err == nil {
@@ -355,12 +318,11 @@ func GetUser(c echo.Context) *models.User {
 		}
 	}
 
-	// Cek session cookie
 	return GetSession(c)
 }
 
 // IsLoggedIn cek apakah user sudah login
-func IsLoggedIn(c echo.Context) bool {
+func IsLoggedIn(c *core.Context) bool {
 	return GetUser(c) != nil
 }
 
@@ -377,8 +339,8 @@ func InGroup(user *models.User, groupName string) bool {
 	return false
 }
 
-// RequireAuth cek login, redirect jika belum
-func RequireAuth(c echo.Context) bool {
+// RequireAuth middleware - redirect jika belum login
+func RequireAuth(c *core.Context) bool {
 	if !IsLoggedIn(c) {
 		c.Redirect(http.StatusFound, "/auth/login")
 		return false
@@ -387,7 +349,7 @@ func RequireAuth(c echo.Context) bool {
 }
 
 // RequireGroup cek login + group membership
-func RequireGroup(c echo.Context, groupName string) bool {
+func RequireGroup(c *core.Context, groupName string) bool {
 	user := GetUser(c)
 	if user == nil {
 		c.Redirect(http.StatusFound, "/auth/login")
