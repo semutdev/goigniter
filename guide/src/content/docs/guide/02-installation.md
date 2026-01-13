@@ -22,18 +22,40 @@ go version
 
 ## Cara Install
 
-### Clone Repository
+### Opsi 1: Pakai Starter Project (Recommended)
+
+Cara tercepat untuk memulai project baru:
 
 ```bash
-git clone https://github.com/semutdev/goigniter myapp
-cd myapp
+# Clone repository
+git clone https://github.com/semutdev/goigniter
+cd goigniter
+
+# Copy starter ke folder project baru
+cp -r starter/ ~/projects/myapp
+cd ~/projects/myapp
+
+# Setup go.mod
+mv go.mod.example go.mod
+# Edit go.mod: ganti "myapp" dengan nama module kamu
+
+# Install dependencies
+go mod tidy
+
+# Jalankan
+go run main.go
 ```
 
-### Jalankan Contoh
+Buka browser ke `http://localhost:8080/welcomecontroller` dan kamu akan melihat halaman welcome.
+
+### Opsi 2: Jalankan Contoh
 
 GoIgniter menyediakan beberapa contoh di folder `examples/`:
 
 ```bash
+git clone https://github.com/semutdev/goigniter
+cd goigniter
+
 # Contoh sederhana
 go run examples/simple/main.go
 
