@@ -27,14 +27,10 @@ class Welcome extends CI_Controller {
 ```
 
 ```go
-// GoIgniter: application/controllers/welcome.go
-package controllers
+// GoIgniter: main.go atau controller file
+package main
 
 import "goigniter/system/core"
-
-func init() {
-    core.Register(&WelcomeController{})
-}
 
 type WelcomeController struct {
     core.Controller
@@ -58,28 +54,16 @@ Pola yang sama:
 
 ## Register & AutoRoute
 
-Untuk mengaktifkan auto-routing, ada dua langkah:
-
-### Langkah 1: Register Controller
-
-Di setiap file controller, register di fungsi `init()`:
-
-```go
-func init() {
-    core.Register(&WelcomeController{})
-}
-```
-
-### Langkah 2: Aktifkan AutoRoute
-
-Di `main.go`, panggil `AutoRoute()`:
+Untuk mengaktifkan auto-routing, cukup register controller lalu panggil `AutoRoute()`:
 
 ```go
 func main() {
     app := core.New()
 
-    // Import controllers untuk trigger init()
-    _ = controllers.WelcomeController{}
+    // Register controllers
+    core.Register(&WelcomeController{})
+    core.Register(&ProductController{})
+    core.Register(&DashboardController{}, "admin") // dengan prefix
 
     // Aktifkan auto-routing
     app.AutoRoute()
@@ -88,19 +72,7 @@ func main() {
 }
 ```
 
-Atau lebih praktis dengan blank import:
-
-```go
-import (
-    _ "myapp/application/controllers" // trigger semua init()
-)
-
-func main() {
-    app := core.New()
-    app.AutoRoute()
-    app.Run(":8080")
-}
-```
+Itu saja! Routes akan otomatis dibuat berdasarkan nama controller dan method.
 
 ## CRUD Mapping Otomatis
 
@@ -136,19 +108,25 @@ func (w *WelcomeController) Contact() {
 
 ## Nested Controller (Admin Panel)
 
-Untuk controller yang berada dalam subfolder (misalnya admin):
+Untuk controller dengan prefix (misalnya admin), tambahkan parameter kedua saat register:
 
 ```go
-// application/controllers/admin/dashboard.go
-package admin
+// main.go
+func main() {
+    app := core.New()
 
-import "goigniter/system/core"
+    // Controller biasa
+    core.Register(&ProductController{})
 
-func init() {
-    // Parameter kedua adalah prefix
+    // Controller dengan prefix "admin"
     core.Register(&DashboardController{}, "admin")
+    core.Register(&UserController{}, "admin")
+
+    app.AutoRoute()
+    app.Run(":8080")
 }
 
+// DashboardController
 type DashboardController struct {
     core.Controller
 }
@@ -159,15 +137,12 @@ func (d *DashboardController) Index() {
 }
 ```
 
-Struktur folder:
+Hasil routing:
 
 ```
-application/controllers/
-├── welcome.go              → /welcomecontroller
-├── products.go             → /productcontroller
-└── admin/
-    ├── dashboard.go        → /admin/dashboardcontroller
-    └── users.go            → /admin/userscontroller
+ProductController     → /productcontroller
+DashboardController   → /admin/dashboardcontroller
+UserController        → /admin/usercontroller
 ```
 
 ## Akses Request Data
@@ -221,12 +196,17 @@ p.Ctx.NoContent(204)
 ## Contoh Lengkap: Product CRUD
 
 ```go
-package controllers
+package main
 
 import "goigniter/system/core"
 
-func init() {
+func main() {
+    app := core.New()
+
     core.Register(&ProductController{})
+
+    app.AutoRoute()
+    app.Run(":8080")
 }
 
 type ProductController struct {
