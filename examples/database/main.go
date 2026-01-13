@@ -3,6 +3,7 @@ package main
 import (
 	"fmt"
 	"log"
+	"os"
 
 	"goigniter/system/core"
 	"goigniter/system/libraries/database"
@@ -27,11 +28,28 @@ type Product struct {
 }
 
 var db *database.DB
+var dbDriver string
 
 func main() {
-	// Open SQLite database
+	// Check environment for database driver
+	// Default: SQLite
+	// For MySQL: DB_DRIVER=mysql DB_DSN="user:password@tcp(localhost:3306)/dbname?parseTime=true"
+	dbDriver = os.Getenv("DB_DRIVER")
+	dbDSN := os.Getenv("DB_DSN")
+
+	if dbDriver == "" {
+		dbDriver = "sqlite"
+	}
+	if dbDSN == "" {
+		if dbDriver == "sqlite" {
+			dbDSN = "./app.db"
+		} else {
+			log.Fatal("DB_DSN environment variable is required for non-SQLite databases")
+		}
+	}
+
 	var err error
-	db, err = database.Open("sqlite", "./app.db")
+	db, err = database.Open(dbDriver, dbDSN)
 	if err != nil {
 		log.Fatal(err)
 	}
@@ -68,6 +86,7 @@ func main() {
 	fmt.Println("  GoIgniter - Database Query Builder Demo")
 	fmt.Println("===========================================")
 	fmt.Println()
+	fmt.Printf("Database driver: %s\n", dbDriver)
 	fmt.Println("Server running at http://localhost:8080")
 	fmt.Println()
 	fmt.Println("Available endpoints:")
@@ -87,38 +106,69 @@ func main() {
 }
 
 func setupDatabase() {
-	// Create users table
-	db.Exec(`
-		CREATE TABLE IF NOT EXISTS users (
-			id INTEGER PRIMARY KEY AUTOINCREMENT,
-			name TEXT NOT NULL,
-			email TEXT NOT NULL UNIQUE,
-			status TEXT DEFAULT 'active'
-		)
-	`)
+	if dbDriver == "mysql" {
+		// MySQL syntax
+		db.Exec(`
+			CREATE TABLE IF NOT EXISTS users (
+				id INT AUTO_INCREMENT PRIMARY KEY,
+				name VARCHAR(255) NOT NULL,
+				email VARCHAR(255) NOT NULL UNIQUE,
+				status VARCHAR(50) DEFAULT 'active'
+			)
+		`)
 
-	// Create products table
-	db.Exec(`
-		CREATE TABLE IF NOT EXISTS products (
-			id INTEGER PRIMARY KEY AUTOINCREMENT,
-			name TEXT NOT NULL,
-			price REAL NOT NULL,
-			stock INTEGER DEFAULT 0
-		)
-	`)
+		db.Exec(`
+			CREATE TABLE IF NOT EXISTS products (
+				id INT AUTO_INCREMENT PRIMARY KEY,
+				name VARCHAR(255) NOT NULL,
+				price DECIMAL(15,2) NOT NULL,
+				stock INT DEFAULT 0
+			)
+		`)
 
-	// Create orders table (for join demo)
-	db.Exec(`
-		CREATE TABLE IF NOT EXISTS orders (
-			id INTEGER PRIMARY KEY AUTOINCREMENT,
-			user_id INTEGER NOT NULL,
-			product_id INTEGER NOT NULL,
-			quantity INTEGER NOT NULL,
-			total REAL NOT NULL,
-			FOREIGN KEY (user_id) REFERENCES users(id),
-			FOREIGN KEY (product_id) REFERENCES products(id)
-		)
-	`)
+		db.Exec(`
+			CREATE TABLE IF NOT EXISTS orders (
+				id INT AUTO_INCREMENT PRIMARY KEY,
+				user_id INT NOT NULL,
+				product_id INT NOT NULL,
+				quantity INT NOT NULL,
+				total DECIMAL(15,2) NOT NULL,
+				FOREIGN KEY (user_id) REFERENCES users(id),
+				FOREIGN KEY (product_id) REFERENCES products(id)
+			)
+		`)
+	} else {
+		// SQLite syntax
+		db.Exec(`
+			CREATE TABLE IF NOT EXISTS users (
+				id INTEGER PRIMARY KEY AUTOINCREMENT,
+				name TEXT NOT NULL,
+				email TEXT NOT NULL UNIQUE,
+				status TEXT DEFAULT 'active'
+			)
+		`)
+
+		db.Exec(`
+			CREATE TABLE IF NOT EXISTS products (
+				id INTEGER PRIMARY KEY AUTOINCREMENT,
+				name TEXT NOT NULL,
+				price REAL NOT NULL,
+				stock INTEGER DEFAULT 0
+			)
+		`)
+
+		db.Exec(`
+			CREATE TABLE IF NOT EXISTS orders (
+				id INTEGER PRIMARY KEY AUTOINCREMENT,
+				user_id INTEGER NOT NULL,
+				product_id INTEGER NOT NULL,
+				quantity INTEGER NOT NULL,
+				total REAL NOT NULL,
+				FOREIGN KEY (user_id) REFERENCES users(id),
+				FOREIGN KEY (product_id) REFERENCES products(id)
+			)
+		`)
+	}
 }
 
 func seedData() {
