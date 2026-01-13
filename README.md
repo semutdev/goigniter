@@ -44,6 +44,7 @@ func main() {
 | `examples/simple` | Basic routing & JSON response | `go run examples/simple/main.go` |
 | `examples/autoroute` | Controller auto-routing | `go run examples/autoroute/main.go` |
 | `examples/views` | Template rendering | `cd examples/views && go run main.go` |
+| `examples/database` | Query builder (SQLite) | `go run examples/database/main.go` |
 | `examples/full-crud` | Full CRUD with database (GORM) | `cd examples/full-crud && go run main.go` |
 
 ## Documentation
@@ -57,9 +58,10 @@ goigniter/
 ├── system/
 │   ├── core/           # Core framework (router, context, controller)
 │   ├── middleware/     # Built-in middleware
-│   ├── libraries/      # Session, etc
+│   ├── libraries/      # Session, database query builder
 │   └── helpers/        # URL helpers, template funcs
-└── examples/           # Usage examples
+├── examples/           # Usage examples
+└── starter/            # Quick start template
 ```
 
 ## License
