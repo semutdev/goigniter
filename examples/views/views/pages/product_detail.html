@@ -1,0 +1,22 @@
+<div class="breadcrumb">
+    <a href="{{site_url "/products"}}">Products</a> &raquo; {{.product.name}}
+</div>
+
+<div class="product-detail">
+    <div class="product-image-large">📦</div>
+    <div class="product-info">
+        <h1>{{.product.name}}</h1>
+        <p class="price-large">Rp {{.product.price}}</p>
+        <p class="stock">Stock: {{.product.stock}} units</p>
+
+        <div class="description">
+            <h3>Description</h3>
+            <p>{{.product.description}}</p>
+        </div>
+
+        <div class="actions">
+            <button class="btn">Add to Cart</button>
+            <a href="{{site_url "/products"}}" class="btn btn-secondary">Back to Products</a>
+        </div>
+    </div>
+</div>

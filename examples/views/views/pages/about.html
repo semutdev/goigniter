@@ -1,0 +1,24 @@
+<div class="page-header">
+    <h1>About Us</h1>
+    <p>Learn more about the team behind GoIgniter.</p>
+</div>
+
+<section class="about-content">
+    <h2>Our Story</h2>
+    <p>GoIgniter was created to provide a simple, fast, and lightweight web framework for Go developers who love the simplicity of CodeIgniter.</p>
+
+    <p>We believe in keeping things simple. That's why GoIgniter is built on top of Go's standard library with minimal external dependencies.</p>
+</section>
+
+<section class="team">
+    <h2>Our Team</h2>
+    <div class="team-grid">
+        {{range .team}}
+        <div class="team-card">
+            <div class="avatar">{{slice .name 0 1}}</div>
+            <h3>{{.name}}</h3>
+            <p class="role">{{.role}}</p>
+        </div>
+        {{end}}
+    </div>
+</section>

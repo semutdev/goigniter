@@ -1,0 +1,22 @@
+<div class="page-header">
+    <h1>Products</h1>
+    <p>Browse our product catalog.</p>
+</div>
+
+<div class="product-grid">
+    {{range .products}}
+    <div class="product-card">
+        <div class="product-image">📦</div>
+        <h3>{{.name}}</h3>
+        <p class="price">Rp {{.price}}</p>
+        <p class="stock">Stock: {{.stock}} units</p>
+        <a href="{{site_url (printf "/products/%v" .id)}}" class="btn btn-small">View Detail</a>
+    </div>
+    {{end}}
+</div>
+
+{{if eq (len .products) 0}}
+<div class="empty-state">
+    <p>No products available.</p>
+</div>
+{{end}}

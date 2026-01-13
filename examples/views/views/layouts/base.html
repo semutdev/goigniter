@@ -1,0 +1,32 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>{{.title}} - GoIgniter</title>
+    <link rel="stylesheet" href="{{base_url "/public/css/style.css"}}">
+</head>
+<body>
+    <nav class="navbar">
+        <div class="container">
+            <a href="{{base_url "/"}}" class="logo">GoIgniter</a>
+            <ul class="nav-links">
+                <li><a href="{{site_url "/"}}">Home</a></li>
+                <li><a href="{{site_url "/about"}}">About</a></li>
+                <li><a href="{{site_url "/products"}}">Products</a></li>
+                <li><a href="{{site_url "/contact"}}">Contact</a></li>
+            </ul>
+        </div>
+    </nav>
+
+    <main class="container">
+        {{template "content" .}}
+    </main>
+
+    <footer class="footer">
+        <div class="container">
+            <p>&copy; 2024 GoIgniter. Built with ❤️ using net/http stdlib.</p>
+        </div>
+    </footer>
+</body>
+</html>
