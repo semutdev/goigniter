@@ -1,0 +1,33 @@
+---
+title: Welcome to Goigniter
+description: Framework Golang rasa CodeIgniter 3.
+template: splash
+hero:
+  tagline: Pindah ke Golang tanpa kehilangan rasa rumah (CI3). Performa Go, Kesederhanaan PHP.
+  image:
+    file: ../../assets/logo-goigniter.png
+  actions:
+    - text: Baca User Guide
+      link: /guide/installation
+      icon: right-arrow
+      variant: primary
+    - text: Lihat di GitHub
+      link: https://github.com/semutdev/goigniter
+      icon: external
+---
+
+import { Card, CardGrid } from '@astrojs/starlight/components';
+
+## Mengapa Goigniter?
+
+<CardGrid stagger>
+	<Card title="Familiar Syntax" icon="pencil">
+		Struktur folder `controllers`, `models`, `views` yang sama persis dengan CI3. Gak perlu adaptasi lama.
+	</Card>
+	<Card title="Golang Performance" icon="rocket">
+		Dapatkan kecepatan *compiled language*. Request selesai dalam hitungan mikrodetik, bukan milidetik.
+	</Card>
+	<Card title="Auto Routing" icon="setting">
+		Magic Routing ala CI3. Cukup buat file controller, method `Index()` otomatis jadi root.
+	</Card>
+</CardGrid>
