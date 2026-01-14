@@ -5,7 +5,7 @@ import (
 	"strconv"
 	"strings"
 
-	"goigniter/system/core"
+	"github.com/semutdev/goigniter/system/core"
 )
 
 // CORSConfig holds configuration for the CORS middleware.

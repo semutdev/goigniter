@@ -6,7 +6,7 @@ import (
 	"net/http"
 	"runtime"
 
-	"goigniter/system/core"
+	"github.com/semutdev/goigniter/system/core"
 )
 
 // Recovery returns a middleware that recovers from panics.

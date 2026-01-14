@@ -11,7 +11,7 @@ import (
 	"sync"
 	"time"
 
-	"goigniter/system/core"
+	"github.com/semutdev/goigniter/system/core"
 )
 
 // Config holds session configuration.

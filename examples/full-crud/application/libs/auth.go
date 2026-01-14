@@ -14,7 +14,7 @@ import (
 
 	"github.com/golang-jwt/jwt/v5"
 	"golang.org/x/crypto/bcrypt"
-	"goigniter/system/core"
+	"github.com/semutdev/goigniter/system/core"
 )
 
 // Auth errors

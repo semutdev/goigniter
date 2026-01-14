@@ -3,7 +3,7 @@ package admin
 import (
 	"full-crud/application/libs"
 
-	"goigniter/system/core"
+	"github.com/semutdev/goigniter/system/core"
 )
 
 func init() {

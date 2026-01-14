@@ -3,7 +3,7 @@ package middleware
 import (
 	"net/http"
 
-	"goigniter/system/core"
+	"github.com/semutdev/goigniter/system/core"
 )
 
 // Auth returns a basic authentication middleware.

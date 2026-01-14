@@ -1,7 +1,7 @@
 package controllers
 
 import (
-	"goigniter/system/core"
+	"github.com/semutdev/goigniter/system/core"
 )
 
 func init() {

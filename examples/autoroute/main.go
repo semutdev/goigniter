@@ -4,8 +4,8 @@ import (
 	"fmt"
 	"log"
 
-	"goigniter/system/core"
-	"goigniter/system/middleware"
+	"github.com/semutdev/goigniter/system/core"
+	"github.com/semutdev/goigniter/system/middleware"
 )
 
 func main() {

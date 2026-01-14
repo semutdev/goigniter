@@ -5,7 +5,7 @@ import (
 	"sync"
 	"time"
 
-	"goigniter/system/core"
+	"github.com/semutdev/goigniter/system/core"
 )
 
 // RateLimitConfig holds configuration for the rate limiter.

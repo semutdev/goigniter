@@ -6,7 +6,7 @@ import (
 	"testing"
 	"time"
 
-	"goigniter/system/core"
+	"github.com/semutdev/goigniter/system/core"
 )
 
 func TestLogger(t *testing.T) {

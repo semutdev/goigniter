@@ -5,7 +5,7 @@ import (
 	"log"
 	"time"
 
-	"goigniter/system/core"
+	"github.com/semutdev/goigniter/system/core"
 )
 
 // Logger returns a middleware that logs HTTP requests.

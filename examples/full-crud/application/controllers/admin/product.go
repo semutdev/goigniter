@@ -7,7 +7,7 @@ import (
 	"net/http"
 	"strconv"
 
-	"goigniter/system/core"
+	"github.com/semutdev/goigniter/system/core"
 )
 
 func init() {

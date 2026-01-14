@@ -5,8 +5,8 @@ import (
 	"os"
 	"strings"
 
-	"goigniter/system/libraries/session"
-	"goigniter/system/core"
+	"github.com/semutdev/goigniter/system/libraries/session"
+	"github.com/semutdev/goigniter/system/core"
 )
 
 // BaseURL returns the base URL from APP_URL env

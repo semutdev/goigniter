@@ -1,4 +1,4 @@
-module goigniter
+module github.com/semutdev/goigniter
 
 go 1.24.8
 

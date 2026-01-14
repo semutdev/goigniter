@@ -14,10 +14,10 @@ import (
 	_ "full-crud/application/controllers/admin"
 
 	"github.com/joho/godotenv"
-	"goigniter/system/core"
-	"goigniter/system/helpers"
-	"goigniter/system/libraries/session"
-	"goigniter/system/middleware"
+	"github.com/semutdev/goigniter/system/core"
+	"github.com/semutdev/goigniter/system/helpers"
+	"github.com/semutdev/goigniter/system/libraries/session"
+	"github.com/semutdev/goigniter/system/middleware"
 )
 
 func main() {

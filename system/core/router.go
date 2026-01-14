@@ -1,7 +1,7 @@
 package core
 
 import (
-	"goigniter/system/core/internal/radix"
+	"github.com/semutdev/goigniter/system/core/internal/radix"
 )
 
 // Router manages HTTP routes using a radix tree for each HTTP method.

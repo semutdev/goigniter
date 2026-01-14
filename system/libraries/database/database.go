@@ -5,7 +5,7 @@ import (
 	"database/sql"
 	"fmt"
 
-	"goigniter/system/libraries/database/drivers"
+	"github.com/semutdev/goigniter/system/libraries/database/drivers"
 )
 
 // DB represents a database connection with query builder capabilities.

@@ -5,10 +5,10 @@ import (
 	"log"
 	"os"
 
-	"goigniter/system/core"
-	"goigniter/system/libraries/database"
-	_ "goigniter/system/libraries/database/drivers" // Register drivers
-	"goigniter/system/middleware"
+	"github.com/semutdev/goigniter/system/core"
+	"github.com/semutdev/goigniter/system/libraries/database"
+	_ "github.com/semutdev/goigniter/system/libraries/database/drivers" // Register drivers
+	"github.com/semutdev/goigniter/system/middleware"
 )
 
 // User model
