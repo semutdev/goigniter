@@ -5,7 +5,16 @@ import starlight from '@astrojs/starlight';
 export default defineConfig({
   integrations: [
     starlight({
-      title: 'Goigniter Docs',
+      title: 'Goigniter',
+      favicon: '/favicon/favicon.ico',
+      logo: {
+        src: './src/assets/goigniter-logo.png',
+        replacesTitle: false, 
+      },
+      // accentColor: 'blue',
+      customCss: [
+        './src/styles/custom.css',
+      ],
       social: [
         {
           label: 'GitHub',
