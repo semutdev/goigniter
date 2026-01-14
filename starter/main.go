@@ -3,6 +3,8 @@ package main
 import (
 	"log"
 
+	"myapp/application/controllers"
+
 	"github.com/semutdev/goigniter/system/core"
 	"github.com/semutdev/goigniter/system/middleware"
 )
@@ -23,16 +25,17 @@ func main() {
 	// Serve static files
 	app.Static("/static/", "./public")
 
-	// Welcome page at root
-	app.GET("/", func(c *core.Context) error {
-		return c.View("welcome", core.Map{
-			"Title": "Welcome to GoIgniter!",
-		})
-	})
+	// Register controllers
+	core.Register(&controllers.WelcomeController{})
 
-	// Register controllers for auto-routing (optional)
-	// core.Register(&YourController{})
-	// app.AutoRoute()
+	// Enable auto-routing
+	// GET /welcome -> WelcomeController.Index()
+	app.AutoRoute()
+
+	// Root redirect to /welcome
+	app.GET("/", func(c *core.Context) error {
+		return c.Redirect(302, "/welcome")
+	})
 
 	// Start server
 	log.Println("===========================================")
