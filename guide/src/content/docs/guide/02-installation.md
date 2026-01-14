@@ -7,155 +7,86 @@ sidebar:
 
 ## Prasyarat
 
-Sebelum memulai, pastikan kamu sudah menginstall:
+Pastikan kamu sudah menginstall:
 
-- **Go 1.20** atau yang lebih baru - [Download Go](https://go.dev/dl/)
-- **Text editor** - VS Code dengan [Go extension](https://marketplace.visualstudio.com/items?itemName=golang.Go) sangat direkomendasikan
-- **Terminal** - Command prompt, PowerShell, atau terminal favorit kamu
+- **Go 1.21** atau yang lebih baru - [Download Go](https://go.dev/dl/)
 
-Untuk mengecek versi Go:
+Cek versi Go:
 
 ```bash
 go version
-# Output: go version go1.21.0 darwin/amd64 (atau sejenisnya)
 ```
 
-## Cara Install
+## Quick Start
 
-### Opsi 1: Pakai Starter Project (Recommended)
+### 1. Download
 
-Cara tercepat untuk memulai project baru:
+Download starter dari [GitHub Releases](https://github.com/semutdev/goigniter/releases/latest).
 
-```bash
-# Clone repository
-git clone https://github.com/semutdev/goigniter
-cd goigniter
-
-# Copy starter ke folder project baru
-cp -r starter/ ~/projects/myapp
-cd ~/projects/myapp
-
-# Setup go.mod
-mv go.mod.example go.mod
-# Edit go.mod: ganti "myapp" dengan nama module kamu
-
-# Install dependencies
-go mod tidy
-
-# Jalankan
-go run main.go
-```
-
-Buka browser ke `http://localhost:8080/welcomecontroller` dan kamu akan melihat halaman welcome.
-
-### Opsi 2: Jalankan Contoh
-
-GoIgniter menyediakan beberapa contoh di folder `examples/`:
+Atau clone langsung:
 
 ```bash
 git clone https://github.com/semutdev/goigniter
-cd goigniter
+cd goigniter/starter
+```
 
-# Contoh sederhana
-go run examples/simple/main.go
+### 2. Install Dependencies
 
-# Contoh dengan auto-routing
-go run examples/autoroute/main.go
-
-# Contoh lengkap dengan database
-cd examples/full-crud
+```bash
 go mod tidy
+```
+
+### 3. Jalankan
+
+```bash
 go run main.go
 ```
 
-Buka browser ke `http://localhost:8080` dan kamu akan melihat hasilnya.
+Buka http://localhost:8080 - Welcome to GoIgniter!
 
 ## Struktur Folder
 
-Jika kamu familiar dengan CI3, struktur folder GoIgniter akan terasa seperti rumah:
-
 ```
-CodeIgniter 3:              GoIgniter:
-───────────────             ──────────
-application/                application/
-├── controllers/            ├── controllers/
-├── models/                 ├── models/
-├── views/                  ├── views/
-├── config/                 ├── config/
-└── libraries/              └── libs/
-
-system/                     system/
-                            ├── core/
-                            ├── middleware/
-                            ├── libraries/
-                            └── helpers/
-
-index.php                   main.go
+myapp/
+├── application/
+│   ├── controllers/    # Controller kamu
+│   └── views/          # Template HTML
+├── public/             # Static files (CSS, JS, images)
+├── go.mod
+└── main.go             # Entry point
 ```
 
-Perbedaan utama:
-- `index.php` diganti `main.go` sebagai entry point
-- Folder `system/` berisi framework core (mirip CI3, tapi jangan dimodifikasi)
-- Tidak ada folder `cache/` atau `logs/` - Go handle ini secara berbeda
+Jika kamu familiar dengan CI3:
+
+| CodeIgniter 3 | GoIgniter |
+|---------------|-----------|
+| `application/controllers/` | `application/controllers/` |
+| `application/views/` | `application/views/` |
+| `index.php` | `main.go` |
 
 ## Hello World
 
-Berikut contoh `main.go` paling sederhana:
+Edit `main.go` untuk menambah route baru:
 
 ```go
-package main
-
-import (
-    "goigniter/system/core"
-    "goigniter/system/middleware"
-)
-
-func main() {
-    // Buat aplikasi baru
-    app := core.New()
-
-    // Pasang middleware
-    app.Use(middleware.Logger())
-    app.Use(middleware.Recovery())
-
-    // Route sederhana
-    app.GET("/", func(c *core.Context) error {
-        return c.JSON(200, core.Map{
-            "message": "Hello GoIgniter!",
-        })
+app.GET("/hello", func(c *core.Context) error {
+    return c.JSON(200, core.Map{
+        "message": "Hello World!",
     })
-
-    // Jalankan server
-    app.Run(":8080")
-}
+})
 ```
 
-Jalankan dengan:
+Restart server dan buka http://localhost:8080/hello
+
+## Hot Reload (Opsional)
+
+Untuk auto-restart saat file berubah, gunakan [Air](https://github.com/cosmtrek/air):
 
 ```bash
-go run main.go
-```
-
-Buka `http://localhost:8080` di browser, kamu akan melihat response JSON:
-
-```json
-{"message": "Hello GoIgniter!"}
-```
-
-## Hot Reload untuk Development (Opsional)
-
-Secara default, kamu harus restart server setiap kali ada perubahan kode. Untuk development yang lebih nyaman, gunakan [Air](https://github.com/cosmtrek/air):
-
-```bash
-# Install air
 go install github.com/cosmtrek/air@latest
-
-# Jalankan dengan hot reload
 air
 ```
 
-Sekarang setiap kali kamu save file `.go`, server akan otomatis restart.
-
 ---
 
-Sudah berhasil running? Lanjut ke [Routing](/guide/03-routing) untuk belajar cara mendefinisikan routes.
+Lanjut ke [Routing](/guide/03-routing) untuk belajar cara mendefinisikan routes.

@@ -20,32 +20,25 @@ func main() {
 		log.Printf("Warning: Could not load templates: %v", err)
 	}
 
-	// Register controllers
-	core.Register(&WelcomeController{})
-
-	// Enable auto-routing
-	app.AutoRoute()
-
 	// Serve static files
 	app.Static("/static/", "./public")
 
+	// Welcome page at root
+	app.GET("/", func(c *core.Context) error {
+		return c.View("welcome", core.Map{
+			"Title": "Welcome to GoIgniter!",
+		})
+	})
+
+	// Register controllers for auto-routing (optional)
+	// core.Register(&YourController{})
+	// app.AutoRoute()
+
 	// Start server
+	log.Println("===========================================")
+	log.Println("  GoIgniter - Your application is ready!")
+	log.Println("===========================================")
+	log.Println()
 	log.Println("Server running at http://localhost:8080")
 	log.Fatal(app.Run(":8080"))
-}
-
-// =============================================================================
-// Welcome Controller
-// =============================================================================
-
-type WelcomeController struct {
-	core.Controller
-}
-
-// Index - GET /welcomecontroller
-func (w *WelcomeController) Index() {
-	w.Ctx.View("welcome", core.Map{
-		"Title":   "Welcome to GoIgniter!",
-		"Message": "Your application is ready.",
-	})
 }
