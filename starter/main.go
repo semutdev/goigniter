@@ -32,9 +32,9 @@ func main() {
 	// GET /welcome -> WelcomeController.Index()
 	app.AutoRoute()
 
-	// Root redirect to /welcome
+	// Root redirect to /welcomecontroller
 	app.GET("/", func(c *core.Context) error {
-		return c.Redirect(302, "/welcome")
+		return c.Redirect(302, "/welcomecontroller")
 	})
 
 	// Start server
