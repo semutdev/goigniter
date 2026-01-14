@@ -1,6 +1,12 @@
 # GoIgniter
 
-A lightweight Go web framework inspired by CodeIgniter, built on net/http stdlib.
+<p align="center">
+  <img src="logo.png" alt="GoIgniter Logo" width="200">
+</p>
+
+<p align="center">
+  <strong>A lightweight Go web framework inspired by CodeIgniter, built on net/http stdlib.</strong>
+</p>
 
 > **Under Development** - This framework is still in active development. API may change without notice. Not recommended for production use yet.
 
