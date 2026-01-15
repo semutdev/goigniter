@@ -26,15 +26,15 @@ func main() {
 	app.Static("/static/", "./public")
 
 	// Register controllers
-	core.Register(&controllers.WelcomeController{})
+	core.Register(&controllers.Welcome{})
 
 	// Enable auto-routing
-	// GET /welcome -> WelcomeController.Index()
+	// GET /welcome -> Welcome.Index()
 	app.AutoRoute()
 
-	// Root redirect to /welcomecontroller
+	// Root redirect to /welcome
 	app.GET("/", func(c *core.Context) error {
-		return c.Redirect(302, "/welcomecontroller")
+		return c.Redirect(302, "/welcome")
 	})
 
 	// Start server

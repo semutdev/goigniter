@@ -1,9 +1,10 @@
+
 <!DOCTYPE html>
 <html lang="en">
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>{{.Title}}</title>
+    <title>Welcome to GoIgniter!</title>
     <style>
         * {
             margin: 0;
@@ -12,7 +13,6 @@
         }
         body {
             font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Oxygen, Ubuntu, sans-serif;
-            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
             min-height: 100vh;
             display: flex;
             align-items: center;
@@ -21,16 +21,15 @@
         .container {
             background: white;
             border-radius: 20px;
-            padding: 50px;
+            padding: 10px;
             text-align: center;
-            box-shadow: 0 25px 50px -12px rgba(0, 0, 0, 0.25);
-            max-width: 500px;
+            max-width: 800px;
             width: 90%;
         }
         .logo {
             width: 150px;
             height: auto;
-            margin-bottom: 30px;
+            margin-bottom: 10px;
         }
         h1 {
             color: #1a202c;
@@ -40,7 +39,7 @@
         .subtitle {
             color: #718096;
             font-size: 1.1rem;
-            margin-bottom: 30px;
+            margin-bottom: 20px;
         }
         .info-box {
             background: #f7fafc;
@@ -71,7 +70,7 @@
             padding: 2px 6px;
             border-radius: 4px;
             font-size: 0.85rem;
-            color: #553c9a;
+            color: #56a6eb;
         }
         .links {
             display: flex;
@@ -89,7 +88,7 @@
             transition: all 0.2s;
         }
         .links a.primary {
-            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            background: #56a6eb;
             color: white;
         }
         .links a.primary:hover {
@@ -113,14 +112,14 @@
 <body>
     <div class="container">
         <img src="/static/logo.png" alt="GoIgniter" class="logo">
-        <h1>{{.Title}}</h1>
+        <h1>Welcome to GoIgniter!</h1>
         <p class="subtitle">Your application is ready.</p>
 
         <div class="info-box">
             <h3>Getting Started</h3>
             <ul>
-                <li>Edit controller di <code>main.go</code></li>
-                <li>Tambah views di <code>application/views/</code></li>
+                <li>Edit controller di <code>application/controllers/welcome.go</code></li>
+                <li>Edit views di <code>application/views/welcome.html</code></li>
                 <li>Static files di <code>public/</code></li>
             </ul>
         </div>

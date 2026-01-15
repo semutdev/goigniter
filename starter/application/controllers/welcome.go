@@ -2,13 +2,13 @@ package controllers
 
 import "github.com/semutdev/goigniter/system/core"
 
-// WelcomeController - Controller default
-type WelcomeController struct {
+// Welcome - Controller default
+type Welcome struct {
 	core.Controller
 }
 
 // Index - GET /welcome
-func (w *WelcomeController) Index() {
+func (w *Welcome) Index() {
 	w.Ctx.View("welcome", core.Map{
 		"Title": "Welcome to GoIgniter!",
 	})
