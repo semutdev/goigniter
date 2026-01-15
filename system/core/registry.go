@@ -43,6 +43,7 @@ func (r *controllerRegistry) registerControllerRoutes(app *Application, basePath
 
 	controllerMiddleware := ctrl.Middleware()
 	methodMiddleware := ctrl.MiddlewareFor()
+	allowedMethods := ctrl.AllowedMethods()
 
 	for i := 0; i < t.NumMethod(); i++ {
 		method := t.Method(i)
@@ -52,13 +53,59 @@ func (r *controllerRegistry) registerControllerRoutes(app *Application, basePath
 			continue
 		}
 
-		httpMethod, routePath := resolveRoute(basePath, methodName)
-		if httpMethod == "" {
-			continue
-		}
+		routePath := resolveRoutePath(basePath, methodName)
+		httpMethods := resolveHTTPMethods(methodName, allowedMethods)
 
 		handler := createControllerHandler(factory, methodName, controllerMiddleware, methodMiddleware[methodName])
-		app.router.Add(httpMethod, routePath, handler)
+
+		// Register route for each HTTP method
+		for _, httpMethod := range httpMethods {
+			app.router.Add(httpMethod, routePath, handler)
+		}
+	}
+}
+
+// resolveRoutePath returns the route path for a method (without HTTP method)
+func resolveRoutePath(basePath, methodName string) string {
+	switch methodName {
+	case "Index":
+		return "/" + basePath
+	case "Show":
+		return "/" + basePath + "/:id"
+	case "Create":
+		return "/" + basePath + "/create"
+	case "Store":
+		return "/" + basePath
+	case "Edit":
+		return "/" + basePath + "/:id/edit"
+	case "Update":
+		return "/" + basePath + "/:id"
+	case "Delete":
+		return "/" + basePath + "/:id"
+	default:
+		return "/" + basePath + "/" + strings.ToLower(methodName)
+	}
+}
+
+// resolveHTTPMethods returns allowed HTTP methods for a controller method
+func resolveHTTPMethods(methodName string, allowedMethods map[string][]string) []string {
+	// Check if explicitly defined in controller
+	if allowedMethods != nil {
+		if methods, ok := allowedMethods[methodName]; ok {
+			return methods
+		}
+	}
+
+	// Default based on method name
+	switch methodName {
+	case "Store":
+		return []string{"POST"}
+	case "Update":
+		return []string{"PUT", "POST"}
+	case "Delete":
+		return []string{"DELETE", "POST"}
+	default:
+		return []string{"GET", "POST"}
 	}
 }
 
@@ -85,9 +132,10 @@ func resolveRoute(basePath, methodName string) (httpMethod, routePath string) {
 
 func isInternalMethod(name string) bool {
 	internal := map[string]bool{
-		"SetContext":    true,
-		"Middleware":    true,
-		"MiddlewareFor": true,
+		"SetContext":     true,
+		"Middleware":     true,
+		"MiddlewareFor":  true,
+		"AllowedMethods": true,
 	}
 	return internal[name]
 }

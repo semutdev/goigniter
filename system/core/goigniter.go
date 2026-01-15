@@ -22,6 +22,11 @@ type ControllerInterface interface {
 
 	// MiddlewareFor returns method-specific middleware.
 	MiddlewareFor() map[string][]Middleware
+
+	// AllowedMethods returns allowed HTTP methods per action.
+	// Return nil to use defaults (GET+POST for most methods).
+	// Example: map[string][]string{"Login": {"GET"}, "Dologin": {"POST"}}
+	AllowedMethods() map[string][]string
 }
 
 // ControllerFactory is a function that creates a new controller instance.

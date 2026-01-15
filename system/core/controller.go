@@ -21,6 +21,13 @@ func (c *Controller) MiddlewareFor() map[string][]Middleware {
 	return nil
 }
 
+// AllowedMethods returns allowed HTTP methods per action.
+// Override this in your controller to restrict methods.
+// Return nil to use defaults (GET+POST for most methods).
+func (c *Controller) AllowedMethods() map[string][]string {
+	return nil
+}
+
 // Loader provides helper methods for loading resources.
 type Loader struct {
 	controller *Controller
