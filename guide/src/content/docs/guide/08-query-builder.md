@@ -419,16 +419,16 @@ import (
     "goigniter/system/libraries/database"
 )
 
-type User struct {
+type UserModel struct {
     ID     int64  `db:"id" json:"id"`
     Name   string `db:"name" json:"name"`
     Email  string `db:"email" json:"email"`
     Status string `db:"status" json:"status"`
 }
 
-type UserController struct{}
+type User struct{}
 
-func (u *UserController) Index(c *core.Context) error {
+func (u *User) Index(c *core.Context) error {
     db := database.Default()
     status := c.Query("status")
 
@@ -437,7 +437,7 @@ func (u *UserController) Index(c *core.Context) error {
         builder = builder.Where("status", status)
     }
 
-    var users []User
+    var users []UserModel
     err := builder.OrderBy("name", "ASC").Get(&users)
     if err != nil {
         return c.JSON(500, core.Map{"error": err.Error()})
@@ -449,11 +449,11 @@ func (u *UserController) Index(c *core.Context) error {
     })
 }
 
-func (u *UserController) Show(c *core.Context) error {
+func (u *User) Show(c *core.Context) error {
     db := database.Default()
     id := c.Param("id")
 
-    var users []User
+    var users []UserModel
     db.Table("users").Where("id", id).First(&users)
 
     if len(users) == 0 {
@@ -463,7 +463,7 @@ func (u *UserController) Show(c *core.Context) error {
     return c.JSON(200, users[0])
 }
 
-func (u *UserController) Store(c *core.Context) error {
+func (u *User) Store(c *core.Context) error {
     db := database.Default()
 
     var input struct {
@@ -489,7 +489,7 @@ func (u *UserController) Store(c *core.Context) error {
     })
 }
 
-func (u *UserController) Update(c *core.Context) error {
+func (u *User) Update(c *core.Context) error {
     db := database.Default()
     id := c.Param("id")
 
@@ -512,7 +512,7 @@ func (u *UserController) Update(c *core.Context) error {
     return c.JSON(200, core.Map{"message": "User updated"})
 }
 
-func (u *UserController) Delete(c *core.Context) error {
+func (u *User) Delete(c *core.Context) error {
     db := database.Default()
     id := c.Param("id")
 

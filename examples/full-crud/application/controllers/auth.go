@@ -8,10 +8,10 @@ import (
 )
 
 func init() {
-	core.Register(&AuthController{})
+	core.Register(&Auth{})
 }
 
-type AuthController struct {
+type Auth struct {
 	core.Controller
 }
 
@@ -32,7 +32,7 @@ type RegisterForm struct {
 }
 
 // Login menampilkan form login
-func (a *AuthController) Login() {
+func (a *Auth) Login() {
 	if libs.IsLoggedIn(a.Ctx) {
 		a.Ctx.Redirect(http.StatusFound, "/")
 		return
@@ -46,7 +46,7 @@ func (a *AuthController) Login() {
 }
 
 // Dologin memproses login
-func (a *AuthController) Dologin() {
+func (a *Auth) Dologin() {
 	email := a.Ctx.FormValue("email")
 	password := a.Ctx.FormValue("password")
 	remember := a.Ctx.FormValue("remember")
@@ -81,13 +81,13 @@ func (a *AuthController) Dologin() {
 }
 
 // Logout menghapus session
-func (a *AuthController) Logout() {
+func (a *Auth) Logout() {
 	libs.ClearSession(a.Ctx)
 	a.Ctx.Redirect(http.StatusFound, "/auth/login")
 }
 
 // Register menampilkan form register
-func (a *AuthController) Register() {
+func (a *Auth) Register() {
 	if libs.IsLoggedIn(a.Ctx) {
 		a.Ctx.Redirect(http.StatusFound, "/")
 		return
@@ -101,7 +101,7 @@ func (a *AuthController) Register() {
 }
 
 // Doregister memproses registrasi
-func (a *AuthController) Doregister() {
+func (a *Auth) Doregister() {
 	email := a.Ctx.FormValue("email")
 	password := a.Ctx.FormValue("password")
 	passwordConfirm := a.Ctx.FormValue("password_confirm")
@@ -153,7 +153,7 @@ func (a *AuthController) Doregister() {
 }
 
 // Activate mengaktivasi akun
-func (a *AuthController) Activate() {
+func (a *Auth) Activate() {
 	selector := a.Ctx.Param("selector")
 	code := a.Ctx.Param("code")
 
@@ -166,14 +166,14 @@ func (a *AuthController) Activate() {
 }
 
 // Forgot menampilkan form forgot password
-func (a *AuthController) Forgot() {
+func (a *Auth) Forgot() {
 	a.Ctx.View("auth/forgot", core.Map{
 		"Title": "Forgot Password",
 	})
 }
 
 // Doforgot memproses forgot password
-func (a *AuthController) Doforgot() {
+func (a *Auth) Doforgot() {
 	email := a.Ctx.FormValue("email")
 
 	if email == "" {
@@ -196,7 +196,7 @@ func (a *AuthController) Doforgot() {
 }
 
 // Reset menampilkan form reset password
-func (a *AuthController) Reset() {
+func (a *Auth) Reset() {
 	selector := a.Ctx.Param("selector")
 	code := a.Ctx.Param("code")
 
@@ -208,7 +208,7 @@ func (a *AuthController) Reset() {
 }
 
 // Doreset memproses reset password
-func (a *AuthController) Doreset() {
+func (a *Auth) Doreset() {
 	selector := a.Ctx.Param("selector")
 	code := a.Ctx.Param("code")
 	password := a.Ctx.FormValue("password")

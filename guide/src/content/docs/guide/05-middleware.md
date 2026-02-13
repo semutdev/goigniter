@@ -234,19 +234,19 @@ app.Use(AuthWithConfig(AuthConfig{
 Middleware juga bisa didefinisikan di level controller:
 
 ```go
-type AdminController struct {
+type Admin struct {
     core.Controller
 }
 
 // Middleware untuk semua method di controller ini
-func (a *AdminController) Middleware() []core.Middleware {
+func (a *Admin) Middleware() []core.Middleware {
     return []core.Middleware{
         AuthMiddleware(),
         AdminOnlyMiddleware(),
     }
 }
 
-func (a *AdminController) Index() {
+func (a *Admin) Index() {
     // Sudah pasti user login dan admin
     a.Ctx.View("admin/dashboard", core.Map{})
 }
@@ -257,12 +257,12 @@ func (a *AdminController) Index() {
 Untuk middleware yang hanya berlaku di method tertentu:
 
 ```go
-type ProductController struct {
+type Product struct {
     core.Controller
 }
 
 // Middleware untuk method tertentu saja
-func (p *ProductController) MiddlewareFor() map[string][]core.Middleware {
+func (p *Product) MiddlewareFor() map[string][]core.Middleware {
     return map[string][]core.Middleware{
         "Store":  {AuthMiddleware()},           // POST butuh login
         "Update": {AuthMiddleware()},           // PUT butuh login
@@ -270,15 +270,15 @@ func (p *ProductController) MiddlewareFor() map[string][]core.Middleware {
     }
 }
 
-func (p *ProductController) Index() {
+func (p *Product) Index() {
     // Public - tanpa auth
 }
 
-func (p *ProductController) Store() {
+func (p *Product) Store() {
     // Butuh login
 }
 
-func (p *ProductController) Delete() {
+func (p *Product) Delete() {
     // Butuh login + admin
 }
 ```

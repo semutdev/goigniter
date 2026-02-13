@@ -11,10 +11,10 @@ import (
 )
 
 func init() {
-	core.Register(&ProductController{}, "admin")
+	core.Register(&Product{}, "admin")
 }
 
-type ProductController struct {
+type Product struct {
 	core.Controller
 }
 
@@ -33,7 +33,7 @@ type DataTablesResponse struct {
 }
 
 // Index menampilkan halaman list product
-func (p *ProductController) Index() {
+func (p *Product) Index() {
 	if !libs.IsLoggedIn(p.Ctx) {
 		p.Ctx.Redirect(http.StatusSeeOther, "/auth/login")
 		return
@@ -47,7 +47,7 @@ func (p *ProductController) Index() {
 }
 
 // Data mengembalikan JSON untuk DataTables
-func (p *ProductController) Data() {
+func (p *Product) Data() {
 	if !libs.IsLoggedIn(p.Ctx) {
 		p.Ctx.JSON(http.StatusUnauthorized, core.Map{"error": "Unauthorized"})
 		return
@@ -109,7 +109,7 @@ func (p *ProductController) Data() {
 }
 
 // Add menampilkan form tambah product
-func (p *ProductController) Add() {
+func (p *Product) Add() {
 	if !libs.IsLoggedIn(p.Ctx) {
 		p.Ctx.Redirect(http.StatusSeeOther, "/auth/login")
 		return
@@ -123,7 +123,7 @@ func (p *ProductController) Add() {
 }
 
 // Store menyimpan product baru
-func (p *ProductController) Store() {
+func (p *Product) Store() {
 	if !libs.IsLoggedIn(p.Ctx) {
 		p.Ctx.Redirect(http.StatusSeeOther, "/auth/login")
 		return
@@ -161,11 +161,11 @@ func (p *ProductController) Store() {
 	config.DB.Create(&product)
 
 	libs.SetFlash(p.Ctx, "success", "Product berhasil ditambahkan")
-	p.Ctx.Redirect(http.StatusSeeOther, "/admin/productcontroller")
+	p.Ctx.Redirect(http.StatusSeeOther, "/admin/product")
 }
 
 // Edit menampilkan form edit product
-func (p *ProductController) Edit() {
+func (p *Product) Edit() {
 	if !libs.IsLoggedIn(p.Ctx) {
 		p.Ctx.Redirect(http.StatusSeeOther, "/auth/login")
 		return
@@ -175,7 +175,7 @@ func (p *ProductController) Edit() {
 	var product models.Product
 	if err := config.DB.First(&product, id).Error; err != nil {
 		libs.SetFlash(p.Ctx, "error", "Product tidak ditemukan")
-		p.Ctx.Redirect(http.StatusSeeOther, "/admin/productcontroller")
+		p.Ctx.Redirect(http.StatusSeeOther, "/admin/product")
 		return
 	}
 
@@ -192,7 +192,7 @@ func (p *ProductController) Edit() {
 }
 
 // Update menyimpan perubahan product
-func (p *ProductController) Update() {
+func (p *Product) Update() {
 	if !libs.IsLoggedIn(p.Ctx) {
 		p.Ctx.Redirect(http.StatusSeeOther, "/auth/login")
 		return
@@ -202,7 +202,7 @@ func (p *ProductController) Update() {
 	var product models.Product
 	if err := config.DB.First(&product, id).Error; err != nil {
 		libs.SetFlash(p.Ctx, "error", "Product tidak ditemukan")
-		p.Ctx.Redirect(http.StatusSeeOther, "/admin/productcontroller")
+		p.Ctx.Redirect(http.StatusSeeOther, "/admin/product")
 		return
 	}
 
@@ -237,11 +237,11 @@ func (p *ProductController) Update() {
 	config.DB.Save(&product)
 
 	libs.SetFlash(p.Ctx, "success", "Product berhasil diupdate")
-	p.Ctx.Redirect(http.StatusSeeOther, "/admin/productcontroller")
+	p.Ctx.Redirect(http.StatusSeeOther, "/admin/product")
 }
 
 // Delete menghapus product
-func (p *ProductController) Delete() {
+func (p *Product) Delete() {
 	if !libs.IsLoggedIn(p.Ctx) {
 		p.Ctx.JSON(http.StatusUnauthorized, core.Map{"error": "Unauthorized"})
 		return

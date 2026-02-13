@@ -5,14 +5,14 @@ import (
 )
 
 func init() {
-	core.Register(&WelcomeController{})
+	core.Register(&Welcome{})
 }
 
-type WelcomeController struct {
+type Welcome struct {
 	core.Controller
 }
 
-func (w *WelcomeController) Index() {
+func (w *Welcome) Index() {
 	w.Ctx.View("welcome", core.Map{
 		"Title": "Welcome to GoIgniter!",
 	})

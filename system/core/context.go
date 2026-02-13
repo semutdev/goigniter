@@ -1,6 +1,7 @@
 package core
 
 import (
+	"bytes"
 	"encoding/json"
 	"io"
 	"net/http"
@@ -253,4 +254,32 @@ func (c *Context) ViewWithCode(code int, name string, data Map) error {
 	c.Response.WriteHeader(code)
 	c.written = true
 	return c.app.renderer.Render(c.Response, name, data)
+}
+
+// Render renders a template to string for composition.
+// Use this to render partials that will be passed to a layout.
+// Example:
+//
+//	sidebar, _ := c.Render("partials/sidebar", data)
+//	c.View("layouts/main", core.Map{"Sidebar": sidebar})
+func (c *Context) Render(name string, data Map) (string, error) {
+	if c.app == nil || c.app.renderer == nil {
+		return "", &TemplateError{Message: "template engine not configured"}
+	}
+
+	var buf bytes.Buffer
+	err := c.app.renderer.Render(&buf, name, data)
+	if err != nil {
+		return "", err
+	}
+	return buf.String(), nil
+}
+
+// TemplateError represents a template rendering error.
+type TemplateError struct {
+	Message string
+}
+
+func (e *TemplateError) Error() string {
+	return e.Message
 }

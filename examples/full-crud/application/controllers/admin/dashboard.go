@@ -7,14 +7,14 @@ import (
 )
 
 func init() {
-	core.Register(&DashboardController{}, "admin")
+	core.Register(&Dashboard{}, "admin")
 }
 
-type DashboardController struct {
+type Dashboard struct {
 	core.Controller
 }
 
-func (d *DashboardController) Index() {
+func (d *Dashboard) Index() {
 	if !libs.RequireGroup(d.Ctx, "admin") {
 		return
 	}

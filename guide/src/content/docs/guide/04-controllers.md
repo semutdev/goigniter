@@ -32,17 +32,17 @@ package main
 
 import "goigniter/system/core"
 
-type WelcomeController struct {
+type Welcome struct {
     core.Controller
 }
 
-func (w *WelcomeController) Index() {
+func (w *Welcome) Index() {
     w.Ctx.View("welcome", core.Map{
         "Title": "Welcome",
     })
 }
 
-func (w *WelcomeController) About() {
+func (w *Welcome) About() {
     w.Ctx.View("about", core.Map{})
 }
 ```
@@ -61,9 +61,9 @@ func main() {
     app := core.New()
 
     // Register controllers
-    core.Register(&WelcomeController{})
-    core.Register(&ProductController{})
-    core.Register(&DashboardController{}, "admin") // dengan prefix
+    core.Register(&Welcome{})
+    core.Register(&Product{})
+    core.Register(&Dashboard{}, "admin") // dengan prefix
 
     // Aktifkan auto-routing
     app.AutoRoute()
@@ -78,31 +78,110 @@ Itu saja! Routes akan otomatis dibuat berdasarkan nama controller dan method.
 
 Berikut method names yang di-mapping secara otomatis ke HTTP routes:
 
-| Method | HTTP | URL |
-|--------|------|-----|
-| `Index()` | GET | `/welcomecontroller` |
-| `Show()` | GET | `/welcomecontroller/:id` |
-| `Create()` | GET | `/welcomecontroller/create` |
-| `Store()` | POST | `/welcomecontroller` |
-| `Edit()` | GET | `/welcomecontroller/:id/edit` |
-| `Update()` | PUT | `/welcomecontroller/:id` |
-| `Delete()` | DELETE | `/welcomecontroller/:id` |
+| Method | HTTP Methods | URL |
+|--------|--------------|-----|
+| `Index()` | GET, POST | `/welcome` |
+| `Show()` | GET, POST | `/welcome/:id` |
+| `Create()` | GET, POST | `/welcome/create` |
+| `Store()` | POST | `/welcome` |
+| `Edit()` | GET, POST | `/welcome/:id/edit` |
+| `Update()` | PUT, POST | `/welcome/:id` |
+| `Delete()` | DELETE, POST | `/welcome/:id` |
 
-Ini mengikuti konvensi RESTful yang umum digunakan.
+Ini mengikuti konvensi RESTful dengan tambahan POST untuk form compatibility (seperti CI3).
 
 ## Custom Method
 
-Method selain yang di atas akan otomatis di-map sebagai GET:
+Method selain yang di atas akan otomatis di-map sebagai GET dan POST (seperti CI3):
 
 ```go
-func (w *WelcomeController) About() {
-    // Otomatis: GET /welcomecontroller/about
+func (w *Welcome) About() {
+    // Otomatis: GET & POST /welcome/about
     w.Ctx.View("about", core.Map{})
 }
 
-func (w *WelcomeController) Contact() {
-    // Otomatis: GET /welcomecontroller/contact
+func (w *Welcome) Contact() {
+    // Otomatis: GET & POST /welcome/contact
     w.Ctx.View("contact", core.Map{})
+}
+```
+
+## AllowedMethods - Kontrol HTTP Methods
+
+Secara default, semua method controller menerima GET dan POST (seperti CI3). Tapi kamu bisa membatasi HTTP methods yang diizinkan dengan `AllowedMethods()`:
+
+```go
+type Auth struct {
+    core.Controller
+}
+
+// Override untuk membatasi HTTP methods
+func (a *Auth) AllowedMethods() map[string][]string {
+    return map[string][]string{
+        "Login":    {"GET"},           // Hanya GET
+        "Dologin":  {"POST"},          // Hanya POST
+        "Logout":   {"GET", "POST"},   // Keduanya (explicit)
+        "Api":      {"GET", "POST", "PUT"}, // Multiple methods
+    }
+}
+
+func (a *Auth) Login() {
+    // GET /auth/login - tampilkan form
+    a.Ctx.View("auth/login", core.Map{"Title": "Login"})
+}
+
+func (a *Auth) Dologin() {
+    // POST /auth/dologin - proses login
+    email := a.Ctx.FormValue("email")
+    password := a.Ctx.FormValue("password")
+    // ... proses login
+}
+
+func (a *Auth) Profile() {
+    // GET & POST /auth/profile (default, tidak perlu didefinisikan)
+    a.Ctx.View("auth/profile", core.Map{})
+}
+```
+
+### Default HTTP Methods
+
+| Method Name | Default HTTP Methods |
+|-------------|---------------------|
+| `Index()` | GET, POST |
+| `Show()` | GET, POST |
+| `Create()` | GET, POST |
+| `Store()` | POST only |
+| `Edit()` | GET, POST |
+| `Update()` | PUT, POST |
+| `Delete()` | DELETE, POST |
+| Method lainnya | GET, POST |
+
+### Perbandingan dengan CI3
+
+Di CI3, semua route menerima GET dan POST secara default. GoIgniter mengikuti behavior yang sama, tapi dengan tambahan kontrol via `AllowedMethods()`:
+
+```php
+// CI3: Tidak ada cara built-in untuk restrict HTTP methods
+// Biasanya dicek manual di controller:
+public function dologin() {
+    if ($this->input->method() !== 'post') {
+        show_404();
+    }
+    // ... proses login
+}
+```
+
+```go
+// GoIgniter: Lebih clean dengan AllowedMethods()
+func (a *Auth) AllowedMethods() map[string][]string {
+    return map[string][]string{
+        "Dologin": {"POST"},
+    }
+}
+
+func (a *Auth) Dologin() {
+    // Otomatis hanya menerima POST
+    // GET akan return 404
 }
 ```
 
@@ -116,23 +195,23 @@ func main() {
     app := core.New()
 
     // Controller biasa
-    core.Register(&ProductController{})
+    core.Register(&Product{})
 
     // Controller dengan prefix "admin"
-    core.Register(&DashboardController{}, "admin")
-    core.Register(&UserController{}, "admin")
+    core.Register(&Dashboard{}, "admin")
+    core.Register(&User{}, "admin")
 
     app.AutoRoute()
     app.Run(":8080")
 }
 
-// DashboardController
-type DashboardController struct {
+// Dashboard
+type Dashboard struct {
     core.Controller
 }
 
-func (d *DashboardController) Index() {
-    // Route: GET /admin/dashboardcontroller
+func (d *Dashboard) Index() {
+    // Route: GET /admin/dashboard
     d.Ctx.View("admin/dashboard", core.Map{})
 }
 ```
@@ -140,17 +219,17 @@ func (d *DashboardController) Index() {
 Hasil routing:
 
 ```
-ProductController     → /productcontroller
-DashboardController   → /admin/dashboardcontroller
-UserController        → /admin/usercontroller
+Product     → /product
+Dashboard   → /admin/dashboard
+User        → /admin/user
 ```
 
 ## Akses Request Data
 
-Di dalam method controller, akses data request via `w.Ctx`:
+Di dalam method controller, akses data request via `p.Ctx`:
 
 ```go
-func (p *ProductController) Store() {
+func (p *Product) Store() {
     // Form data
     name := p.Ctx.FormValue("name")
     price := p.Ctx.FormValue("price")
@@ -203,26 +282,26 @@ import "goigniter/system/core"
 func main() {
     app := core.New()
 
-    core.Register(&ProductController{})
+    core.Register(&Product{})
 
     app.AutoRoute()
     app.Run(":8080")
 }
 
-type ProductController struct {
+type Product struct {
     core.Controller
 }
 
-// GET /productcontroller
-func (p *ProductController) Index() {
+// GET /product
+func (p *Product) Index() {
     products := getProductsFromDB()
     p.Ctx.View("products/index", core.Map{
         "Products": products,
     })
 }
 
-// GET /productcontroller/:id
-func (p *ProductController) Show() {
+// GET /product/:id
+func (p *Product) Show() {
     id := p.Ctx.Param("id")
     product := getProductByID(id)
     p.Ctx.View("products/show", core.Map{
@@ -230,23 +309,23 @@ func (p *ProductController) Show() {
     })
 }
 
-// GET /productcontroller/create
-func (p *ProductController) Create() {
+// GET /product/create
+func (p *Product) Create() {
     p.Ctx.View("products/create", core.Map{})
 }
 
-// POST /productcontroller
-func (p *ProductController) Store() {
+// POST /product
+func (p *Product) Store() {
     name := p.Ctx.FormValue("name")
     price := p.Ctx.FormValue("price")
 
     saveProduct(name, price)
 
-    p.Ctx.Redirect(302, "/productcontroller")
+    p.Ctx.Redirect(302, "/product")
 }
 
-// GET /productcontroller/:id/edit
-func (p *ProductController) Edit() {
+// GET /product/:id/edit
+func (p *Product) Edit() {
     id := p.Ctx.Param("id")
     product := getProductByID(id)
     p.Ctx.View("products/edit", core.Map{
@@ -254,19 +333,19 @@ func (p *ProductController) Edit() {
     })
 }
 
-// PUT /productcontroller/:id
-func (p *ProductController) Update() {
+// PUT /product/:id
+func (p *Product) Update() {
     id := p.Ctx.Param("id")
     name := p.Ctx.FormValue("name")
     price := p.Ctx.FormValue("price")
 
     updateProduct(id, name, price)
 
-    p.Ctx.Redirect(302, "/productcontroller")
+    p.Ctx.Redirect(302, "/product")
 }
 
-// DELETE /productcontroller/:id
-func (p *ProductController) Delete() {
+// DELETE /product/:id
+func (p *Product) Delete() {
     id := p.Ctx.Param("id")
     deleteProduct(id)
     p.Ctx.NoContent(204)

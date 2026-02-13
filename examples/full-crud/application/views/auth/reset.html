@@ -1,8 +1,79 @@
 {{define "auth/reset"}}
-    {{template "auth/layout" .}}
-{{end}}
-
-{{define "auth-content"}}
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <title>{{ .Title }} - GoIgniter</title>
+    <style>
+        * { box-sizing: border-box; }
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+            background: linear-gradient(135deg, #73b9f4 0%, #56A6EB 100%);
+            min-height: 100vh;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            margin: 0;
+            padding: 20px;
+        }
+        .container {
+            background: white;
+            padding: 40px;
+            border-radius: 10px;
+            box-shadow: 0 15px 35px rgba(0,0,0,0.2);
+            width: 100%;
+            max-width: 400px;
+        }
+        h1 {
+            text-align: center;
+            color: #333;
+            margin-bottom: 10px;
+            font-size: 24px;
+        }
+        .subtitle {
+            text-align: center;
+            color: #666;
+            margin-bottom: 30px;
+            font-size: 14px;
+        }
+        .form-group { margin-bottom: 20px; }
+        label {
+            display: block;
+            margin-bottom: 5px;
+            color: #555;
+            font-weight: 500;
+        }
+        input[type="email"],
+        input[type="password"],
+        input[type="text"] {
+            width: 100%;
+            padding: 12px 15px;
+            border: 1px solid #ddd;
+            border-radius: 5px;
+            font-size: 14px;
+            transition: border-color 0.3s;
+        }
+        input:focus { outline: none; border-color: #56A6EB; }
+        button {
+            width: 100%;
+            padding: 12px;
+            background: linear-gradient(135deg, #56A6EB 0%, #73b9f4 100%);
+            color: white;
+            border: none;
+            border-radius: 5px;
+            font-size: 16px;
+            cursor: pointer;
+            transition: opacity 0.3s;
+        }
+        button:hover { opacity: 0.9; }
+        .error { background: #fee; color: #c00; padding: 10px 15px; border-radius: 5px; margin-bottom: 20px; font-size: 14px; }
+        .success { background: #efe; color: #060; padding: 10px 15px; border-radius: 5px; margin-bottom: 20px; font-size: 14px; }
+        .links { text-align: center; margin-top: 20px; font-size: 14px; }
+        .links a { color: #56A6EB; text-decoration: none; }
+        .links a:hover { text-decoration: underline; }
+    </style>
+</head>
+<body>
 <div class="container">
     <h1>Reset Password</h1>
     <p class="subtitle">Masukkan password baru Anda</p>
@@ -34,4 +105,6 @@
         <a href="/auth/login">← Kembali ke Login</a>
     </div>
 </div>
+</body>
+</html>
 {{end}}

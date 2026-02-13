@@ -77,17 +77,17 @@ func main() {
 
 	// Default route
 	app.GET("/", func(c *core.Context) error {
-		return c.Redirect(302, "/welcomecontroller")
+		return c.Redirect(302, "/welcome")
 	})
 
 	// Custom routes untuk auth dengan parameter
 	app.GET("/auth/activate/:selector/:code", func(c *core.Context) error {
 		// Forward to auth controller activate
-		return c.Redirect(302, "/authcontroller/activate")
+		return c.Redirect(302, "/auth/activate")
 	})
 
 	app.GET("/auth/reset/:selector/:code", func(c *core.Context) error {
-		return c.Redirect(302, "/authcontroller/reset")
+		return c.Redirect(302, "/auth/reset")
 	})
 
 	// Start server

@@ -88,7 +88,7 @@ Perbedaan utama:
 Dari controller, kirim data dengan `core.Map`:
 
 ```go
-func (w *WelcomeController) Index() {
+func (w *Welcome) Index() {
     w.Ctx.View("welcome", core.Map{
         "Title":    "Selamat Datang",
         "User":     user,
@@ -300,7 +300,98 @@ Tabel konversi sintaks PHP ke Go template:
 
 3. **Nil handling** - Jika variabel nil, template tidak error tapi tidak menampilkan apa-apa. Gunakan `{{if .Var}}` untuk cek.
 
-4. **Tidak ada partial (yet)** - Fitur `$this->load->view('partial')` belum ada. Coming soon di versi mendatang.
+## Multi-Layout (CI3 Style)
+
+GoIgniter mendukung composing views seperti CodeIgniter 3. Ada dua cara:
+
+### Cara 1: Multiple View Calls
+
+Seperti CI3, kamu bisa panggil `View()` berkali-kali dan output akan di-append:
+
+```go
+func (c *Page) About() {
+    data := core.Map{"Title": "About Us"}
+
+    c.Ctx.View("partials/header", data)
+    c.Ctx.View("pages/about", data)
+    c.Ctx.View("partials/footer", data)
+}
+```
+
+### Cara 2: Render ke String + Compose
+
+Gunakan `Render()` untuk render template ke string, lalu pass ke layout:
+
+```go
+func (d *Dashboard) Index() {
+    // Render partials ke string
+    sidebar, _ := d.Ctx.Render("admin/partials/sidebar", core.Map{})
+    content, _ := d.Ctx.Render("admin/pages/dashboard", core.Map{
+        "Title": "Dashboard",
+    })
+
+    // Output layout dengan partials
+    d.Ctx.View("admin/layouts/main", core.Map{
+        "Title":   "Dashboard",
+        "Sidebar": sidebar,
+        "Content": content,
+    })
+}
+```
+
+Di template layout, gunakan `safe` untuk output HTML string:
+
+```html
+<!-- views/admin/layouts/main.html -->
+<!DOCTYPE html>
+<html>
+<head><title>{{.Title}}</title></head>
+<body>
+    <nav>{{.Sidebar | safe}}</nav>
+    <main>{{.Content | safe}}</main>
+</body>
+</html>
+```
+
+### Struktur Folder Views yang Direkomendasikan
+
+```
+views/
+├── layouts/
+│   ├── main.html        <!-- Layout utama -->
+│   └── admin.html       <!-- Layout admin -->
+├── partials/
+│   ├── header.html
+│   ├── footer.html
+│   └── sidebar.html
+└── pages/
+    ├── home.html
+    ├── about.html
+    └── admin/
+        └── dashboard.html
+```
+
+### Perbandingan dengan CI3
+
+```php
+// CI3: views dengan parameter TRUE untuk return string
+$header = $this->load->view('header', $data, TRUE);
+$content = $this->load->view('content', $data, TRUE);
+$this->load->view('layout', array(
+    'header' => $header,
+    'content' => $content
+));
+```
+
+```go
+// GoIgniter: Render() untuk return string
+header, _ := c.Ctx.Render("header", data)
+content, _ := c.Ctx.Render("content", data)
+c.Ctx.View("layout", core.Map{
+    "Header":  header,
+    "Content": content,
+})
+```
 
 ---
 
