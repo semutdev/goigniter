@@ -5,11 +5,10 @@ import (
 	"log"
 	"os"
 
-	"full-crud/application/models"
 	"full-crud/config"
 	"full-crud/database"
 
-	// Import controllers untuk auto-register
+	// Import controllers for auto-register
 	_ "full-crud/application/controllers"
 	_ "full-crud/application/controllers/admin"
 
@@ -27,15 +26,7 @@ func main() {
 	// Connect to DB
 	config.ConnectDB()
 
-	// Auto migrate tables
-	config.DB.AutoMigrate(
-		&models.User{},
-		&models.Group{},
-		&models.LoginAttempt{},
-		&models.Product{},
-	)
-
-	// Run seeder jika DB_SEED=true
+	// Run seeder if DB_SEED=true (this also creates tables)
 	if os.Getenv("DB_SEED") == "true" {
 		database.Seed(config.DB)
 	}
@@ -72,7 +63,7 @@ func main() {
 	// Static files
 	app.Static("/static/", "./public")
 
-	// Auto-route dari registered controllers
+	// Auto-route from registered controllers
 	app.AutoRoute()
 
 	// Default route
@@ -80,7 +71,7 @@ func main() {
 		return c.Redirect(302, "/welcome")
 	})
 
-	// Custom routes untuk auth dengan parameter
+	// Custom routes for auth with parameters
 	app.GET("/auth/activate/:selector/:code", func(c *core.Context) error {
 		// Forward to auth controller activate
 		return c.Redirect(302, "/auth/activate")
@@ -101,7 +92,7 @@ func main() {
 	fmt.Println("  Email: admin@admin.com")
 	fmt.Println("  Password: password")
 	fmt.Println()
-	fmt.Println("Note: Run with DB_SEED=true to create admin user")
+	fmt.Println("Note: Run with DB_SEED=true to create tables and admin user")
 	fmt.Println()
 
 	log.Fatal(app.Run(port))

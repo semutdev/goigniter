@@ -84,7 +84,7 @@ $(document).ready(function() {
             {
                 data: 'price',
                 render: function(data) {
-                    return 'Rp ' + new Intl.NumberFormat('id-ID').format(data);
+                    return 'Rp ' + new Intl.NumberFormat('id-ID').format(parseFloat(data));
                 }
             },
             { data: 'stock' },
@@ -140,7 +140,7 @@ $(document).ready(function() {
         if (deleteId) {
             $.ajax({
                 url: '{{site_url "admin/product/delete/"}}' + deleteId,
-                type: 'DELETE',
+                type: 'POST',
                 success: function(response) {
                     deleteModal.hide();
                     table.ajax.reload();

@@ -1,49 +1,119 @@
 package database
 
 import (
-	"full-crud/application/models"
 	"log"
 	"time"
 
+	"github.com/semutdev/goigniter/system/libraries/database"
 	"golang.org/x/crypto/bcrypt"
-	"gorm.io/gorm"
 )
 
-// Seed menjalankan seeder untuk data awal
-func Seed(db *gorm.DB) {
+// Seed runs the database seeder
+func Seed(db *database.DB) {
 	log.Println("Running database seeder...")
 
-	// 1. Create groups
+	// 1. Create tables
+	createTables(db)
+
+	// 2. Create groups
 	seedGroups(db)
 
-	// 2. Create default admin user
+	// 3. Create default admin user
 	seedAdminUser(db)
 
 	log.Println("Database seeding completed!")
 }
 
-func seedGroups(db *gorm.DB) {
-	groups := []models.Group{
-		{ID: 1, Name: "admin", Description: "Administrator"},
-		{ID: 2, Name: "members", Description: "General User"},
+func createTables(db *database.DB) {
+	// MySQL schema
+	tables := []string{
+		`CREATE TABLE IF NOT EXISTS groups (
+			id INT AUTO_INCREMENT PRIMARY KEY,
+			name VARCHAR(20) NOT NULL UNIQUE,
+			description VARCHAR(100)
+		) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4`,
+		`CREATE TABLE IF NOT EXISTS users (
+			id INT AUTO_INCREMENT PRIMARY KEY,
+			ip_address VARCHAR(45),
+			username VARCHAR(100),
+			password VARCHAR(255) NOT NULL,
+			email VARCHAR(254) NOT NULL UNIQUE,
+			activation_selector VARCHAR(255),
+			activation_code VARCHAR(255),
+			forgotten_password_selector VARCHAR(255),
+			forgotten_password_code VARCHAR(255),
+			forgotten_password_time INT,
+			remember_selector VARCHAR(255),
+			remember_code VARCHAR(255),
+			created_on INT,
+			last_login INT,
+			active TINYINT(1) DEFAULT 0,
+			first_name VARCHAR(50),
+			last_name VARCHAR(50),
+			company VARCHAR(100),
+			phone VARCHAR(20)
+		) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4`,
+		`CREATE TABLE IF NOT EXISTS users_groups (
+			id INT AUTO_INCREMENT PRIMARY KEY,
+			user_id INT NOT NULL,
+			group_id INT NOT NULL,
+			UNIQUE KEY unique_user_group (user_id, group_id),
+			FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE,
+			FOREIGN KEY (group_id) REFERENCES groups(id) ON DELETE CASCADE
+		) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4`,
+		`CREATE TABLE IF NOT EXISTS login_attempts (
+			id INT AUTO_INCREMENT PRIMARY KEY,
+			ip_address VARCHAR(45),
+			login VARCHAR(100),
+			time INT
+		) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4`,
+		`CREATE TABLE IF NOT EXISTS products (
+			id INT AUTO_INCREMENT PRIMARY KEY,
+			name VARCHAR(255) NOT NULL,
+			price DECIMAL(15,2) NOT NULL,
+			stock INT DEFAULT 0,
+			created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+			updated_at DATETIME DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP
+		) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4`,
 	}
 
-	for _, group := range groups {
-		// Cek apakah sudah ada
-		var existing models.Group
-		result := db.Where("name = ?", group.Name).First(&existing)
-		if result.Error == gorm.ErrRecordNotFound {
-			db.Create(&group)
-			log.Printf("Created group: %s\n", group.Name)
+	for _, sql := range tables {
+		_, err := db.Exec(sql)
+		if err != nil {
+			log.Printf("Error creating table: %v\n", err)
 		}
 	}
 }
 
-func seedAdminUser(db *gorm.DB) {
-	// Cek apakah admin sudah ada
-	var existing models.User
-	result := db.Where("email = ?", "admin@admin.com").First(&existing)
-	if result.Error == nil {
+func seedGroups(db *database.DB) {
+	groups := []struct {
+		Name        string
+		Description string
+	}{
+		{"admin", "Administrator"},
+		{"members", "General User"},
+	}
+
+	for _, g := range groups {
+		// Check if exists
+		var count int64
+		db.Query("SELECT COUNT(*) FROM groups WHERE name = ?", g.Name).Get(&count)
+		if count == 0 {
+			_, err := db.Exec("INSERT INTO groups (name, description) VALUES (?, ?)", g.Name, g.Description)
+			if err != nil {
+				log.Printf("Error creating group %s: %v\n", g.Name, err)
+			} else {
+				log.Printf("Created group: %s\n", g.Name)
+			}
+		}
+	}
+}
+
+func seedAdminUser(db *database.DB) {
+	// Check if admin exists
+	var count int64
+	db.Query("SELECT COUNT(*) FROM users WHERE email = ?", "admin@admin.com").Get(&count)
+	if count > 0 {
 		log.Println("Admin user already exists, skipping...")
 		return
 	}
@@ -58,36 +128,28 @@ func seedAdminUser(db *gorm.DB) {
 	firstName := "Admin"
 	lastName := "istrator"
 	username := "administrator"
+	now := time.Now().Unix()
 
-	admin := models.User{
-		ID:        1,
-		Email:     "admin@admin.com",
-		Username:  &username,
-		Password:  string(hashedPassword),
-		Active:    true,
-		FirstName: &firstName,
-		LastName:  &lastName,
-		CreatedOn: time.Now().Unix(),
-		IPAddress: "127.0.0.1",
-	}
-
-	if err := db.Create(&admin).Error; err != nil {
+	// Insert admin user
+	result, err := db.Exec(`
+		INSERT INTO users (email, username, password, active, first_name, last_name, created_on, ip_address)
+		VALUES (?, ?, ?, ?, ?, ?, ?, ?)
+	`, "admin@admin.com", username, string(hashedPassword), 1, firstName, lastName, now, "127.0.0.1")
+	if err != nil {
 		log.Printf("Error creating admin user: %v\n", err)
 		return
 	}
 
-	// Assign admin to groups
-	var adminGroup models.Group
-	var membersGroup models.Group
-	db.Where("name = ?", "admin").First(&adminGroup)
-	db.Where("name = ?", "members").First(&membersGroup)
+	userID, _ := result.LastInsertId()
 
-	db.Model(&admin).Association("Groups").Append(&adminGroup, &membersGroup)
+	// Get group IDs
+	var adminGroupID, membersGroupID int64
+	db.Query("SELECT id FROM groups WHERE name = ?", "admin").Get(&adminGroupID)
+	db.Query("SELECT id FROM groups WHERE name = ?", "members").Get(&membersGroupID)
+
+	// Assign user to groups
+	db.Exec("INSERT INTO users_groups (user_id, group_id) VALUES (?, ?)", userID, adminGroupID)
+	db.Exec("INSERT INTO users_groups (user_id, group_id) VALUES (?, ?)", userID, membersGroupID)
 
 	log.Println("Created admin user: admin@admin.com / password")
-}
-
-// Ptr helper untuk membuat pointer dari string
-func Ptr(s string) *string {
-	return &s
 }

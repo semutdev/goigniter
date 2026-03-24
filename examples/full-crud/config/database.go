@@ -2,35 +2,47 @@ package config
 
 import (
 	"fmt"
+	"log"
 	"os"
 
-	"gorm.io/driver/mysql"
-	"gorm.io/gorm"
+	"github.com/semutdev/goigniter/system/libraries/database"
+	_ "github.com/semutdev/goigniter/system/libraries/database/drivers"
 )
 
-var DB *gorm.DB
+// DB is the global database instance
+var DB *database.DB
 
+// ConnectDB initializes the database connection
 func ConnectDB() {
-	dsn := buildDSN()
-	var err error
-	DB, err = gorm.Open(mysql.Open(dsn), &gorm.Config{})
+	driver := getEnv("DB_DRIVER", "mysql")
+	dsn := buildDSN(driver)
 
+	var err error
+	DB, err = database.Open(driver, dsn)
 	if err != nil {
-		panic("Gagal koneksi ke database: " + err.Error())
+		panic("Failed to connect to database: " + err.Error())
 	}
 
-	fmt.Println("Database Connected!")
+	// Set as global default
+	database.SetDefault(DB)
+
+	log.Println("Database connected!")
 }
 
-func buildDSN() string {
-	host := getEnv("DB_HOST", "127.0.0.1")
-	port := getEnv("DB_PORT", "3306")
-	user := getEnv("DB_USER", "root")
-	password := os.Getenv("DB_PASSWORD")
-	name := getEnv("DB_NAME", "goigniter")
-
-	return fmt.Sprintf("%s:%s@tcp(%s:%s)/%s?charset=utf8mb4&parseTime=True&loc=Local",
-		user, password, host, port, name)
+func buildDSN(driver string) string {
+	switch driver {
+	case "sqlite":
+		return getEnv("DB_DSN", "./app.db")
+	default:
+		// MySQL
+		host := getEnv("DB_HOST", "127.0.0.1")
+		port := getEnv("DB_PORT", "3306")
+		user := getEnv("DB_USER", "root")
+		password := os.Getenv("DB_PASSWORD")
+		name := getEnv("DB_NAME", "goigniter")
+		return fmt.Sprintf("%s:%s@tcp(%s:%s)/%s?parseTime=true",
+			user, password, host, port, name)
+	}
 }
 
 func getEnv(key, fallback string) string {

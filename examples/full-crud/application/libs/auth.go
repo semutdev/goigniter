@@ -6,53 +6,53 @@ import (
 	"encoding/json"
 	"errors"
 	"full-crud/application/models"
-	"full-crud/config"
 	"net/http"
 	"os"
 	"strings"
 	"time"
 
 	"github.com/golang-jwt/jwt/v5"
-	"golang.org/x/crypto/bcrypt"
 	"github.com/semutdev/goigniter/system/core"
+	"github.com/semutdev/goigniter/system/libraries/database"
+	"golang.org/x/crypto/bcrypt"
 )
 
 // Auth errors
 var (
-	ErrInvalidCredentials = errors.New("invalid email or password")
+	ErrEmailNotFound      = errors.New("email not found")
+	ErrInvalidCredentials = errors.New("invalid password")
 	ErrUserNotActive      = errors.New("user is not activated")
 	ErrUserNotFound       = errors.New("user not found")
 	ErrInvalidToken       = errors.New("invalid or expired token")
 	ErrPasswordMismatch   = errors.New("current password is incorrect")
 )
 
-// JWTClaims untuk JWT token
+// JWTClaims for JWT token
 type JWTClaims struct {
-	UserID uint   `json:"user_id"`
+	UserID int64  `json:"user_id"`
 	Email  string `json:"email"`
 	jwt.RegisteredClaims
 }
 
-// SessionData untuk cookie session
+// SessionData for cookie session
 type SessionData struct {
-	UserID    uint   `json:"user_id"`
+	UserID    int64  `json:"user_id"`
 	Email     string `json:"email"`
 	ExpiresAt int64  `json:"expires_at"`
 }
 
 // --- Core Auth Functions ---
 
-// Login memverifikasi credentials dan return user
+// Login verifies credentials and returns user
 func Login(identity, password, ipAddress string) (*models.User, error) {
 	var user models.User
 
-	result := config.DB.Preload("Groups").
-		Where("email = ? OR username = ?", identity, identity).
+	err := database.Table("users").
+		WhereRaw("email = ?", identity).
 		First(&user)
-
-	if result.Error != nil {
+	if err != nil {
 		logLoginAttempt(ipAddress, identity)
-		return nil, ErrInvalidCredentials
+		return nil, ErrEmailNotFound
 	}
 
 	if err := bcrypt.CompareHashAndPassword([]byte(user.Password), []byte(password)); err != nil {
@@ -64,15 +64,22 @@ func Login(identity, password, ipAddress string) (*models.User, error) {
 		return nil, ErrUserNotActive
 	}
 
+	// Load user groups
+	loadUserGroups(&user)
+
+	// Update last login
 	now := time.Now().Unix()
+	database.Table("users").Where("id", user.ID).Update(map[string]any{
+		"last_login": now,
+		"ip_address": ipAddress,
+	})
 	user.LastLogin = &now
 	user.IPAddress = ipAddress
-	config.DB.Save(&user)
 
 	return &user, nil
 }
 
-// RegisterUser membuat user baru
+// RegisterUser creates a new user
 func RegisterUser(email, password, firstName, lastName, ipAddress string) (*models.User, error) {
 	hashedPassword, err := bcrypt.GenerateFromPassword([]byte(password), bcrypt.DefaultCost)
 	if err != nil {
@@ -83,34 +90,49 @@ func RegisterUser(email, password, firstName, lastName, ipAddress string) (*mode
 	code := generateToken(32)
 	hashedCode, _ := bcrypt.GenerateFromPassword([]byte(code), bcrypt.DefaultCost)
 
-	user := models.User{
-		Email:              email,
-		Password:           string(hashedPassword),
-		FirstName:          &firstName,
-		LastName:           &lastName,
-		IPAddress:          ipAddress,
-		CreatedOn:          time.Now().Unix(),
-		Active:             false,
-		ActivationSelector: &selector,
-		ActivationCode:     stringPtr(string(hashedCode)),
-	}
+	now := time.Now().Unix()
 
-	if err := config.DB.Create(&user).Error; err != nil {
+	// Insert user
+	userID, err := database.Table("users").InsertGetId(map[string]any{
+		"email":               email,
+		"password":            string(hashedPassword),
+		"first_name":          firstName,
+		"last_name":           lastName,
+		"ip_address":          ipAddress,
+		"created_on":          now,
+		"active":              0,
+		"activation_selector": selector,
+		"activation_code":     string(hashedCode),
+	})
+	if err != nil {
 		return nil, err
 	}
 
-	var membersGroup models.Group
-	config.DB.Where("name = ?", "members").First(&membersGroup)
-	config.DB.Model(&user).Association("Groups").Append(&membersGroup)
+	// Get members group ID
+	var membersGroupID int64
+	database.Table("groups").Where("name", "members").Select("id").First(&membersGroupID)
 
-	return &user, nil
+	// Assign to members group
+	database.Table("users_groups").Insert(map[string]any{
+		"user_id":  userID,
+		"group_id": membersGroupID,
+	})
+
+	return &models.User{
+		ID:        userID,
+		Email:     email,
+		FirstName: &firstName,
+		LastName:  &lastName,
+	}, nil
 }
 
-// Activate mengaktivasi user dengan code
+// Activate activates a user with code
 func Activate(selector, code string) error {
 	var user models.User
-	result := config.DB.Where("activation_selector = ?", selector).First(&user)
-	if result.Error != nil {
+	err := database.Table("users").
+		Where("activation_selector", selector).
+		First(&user)
+	if err != nil {
 		return ErrInvalidToken
 	}
 
@@ -121,10 +143,11 @@ func Activate(selector, code string) error {
 		return ErrInvalidToken
 	}
 
-	user.Active = true
-	user.ActivationSelector = nil
-	user.ActivationCode = nil
-	config.DB.Save(&user)
+	database.Table("users").Where("id", user.ID).Update(map[string]any{
+		"active":              1,
+		"activation_selector": nil,
+		"activation_code":     nil,
+	})
 
 	return nil
 }
@@ -132,8 +155,8 @@ func Activate(selector, code string) error {
 // ForgotPassword generates reset token
 func ForgotPassword(email string) (string, string, error) {
 	var user models.User
-	result := config.DB.Where("email = ?", email).First(&user)
-	if result.Error != nil {
+	err := database.Table("users").Where("email", email).First(&user)
+	if err != nil {
 		return "", "", ErrUserNotFound
 	}
 
@@ -142,19 +165,22 @@ func ForgotPassword(email string) (string, string, error) {
 	hashedCode, _ := bcrypt.GenerateFromPassword([]byte(code), bcrypt.DefaultCost)
 	now := time.Now().Unix()
 
-	user.ForgottenPasswordSelector = &selector
-	user.ForgottenPasswordCode = stringPtr(string(hashedCode))
-	user.ForgottenPasswordTime = &now
-	config.DB.Save(&user)
+	database.Table("users").Where("id", user.ID).Update(map[string]any{
+		"forgotten_password_selector": selector,
+		"forgotten_password_code":     string(hashedCode),
+		"forgotten_password_time":     now,
+	})
 
 	return selector, code, nil
 }
 
-// ResetPassword mereset password dengan token
+// ResetPassword resets password with token
 func ResetPassword(selector, code, newPassword string) error {
 	var user models.User
-	result := config.DB.Where("forgotten_password_selector = ?", selector).First(&user)
-	if result.Error != nil {
+	err := database.Table("users").
+		Where("forgotten_password_selector", selector).
+		First(&user)
+	if err != nil {
 		return ErrInvalidToken
 	}
 
@@ -170,18 +196,19 @@ func ResetPassword(selector, code, newPassword string) error {
 	}
 
 	hashedPassword, _ := bcrypt.GenerateFromPassword([]byte(newPassword), bcrypt.DefaultCost)
-	user.Password = string(hashedPassword)
-	user.ForgottenPasswordSelector = nil
-	user.ForgottenPasswordCode = nil
-	user.ForgottenPasswordTime = nil
-	config.DB.Save(&user)
+	database.Table("users").Where("id", user.ID).Update(map[string]any{
+		"password":                    string(hashedPassword),
+		"forgotten_password_selector": nil,
+		"forgotten_password_code":     nil,
+		"forgotten_password_time":     nil,
+	})
 
 	return nil
 }
 
-// --- Session Functions (using core.Context) ---
+// --- Session Functions ---
 
-// SetSession menyimpan user session ke cookie
+// SetSession stores user session in cookie
 func SetSession(c *core.Context, user *models.User, remember bool) error {
 	expiry := time.Now().Add(24 * time.Hour)
 	if remember {
@@ -211,7 +238,7 @@ func SetSession(c *core.Context, user *models.User, remember bool) error {
 	return nil
 }
 
-// GetSession mengambil user dari session cookie
+// GetSession retrieves user from session cookie
 func GetSession(c *core.Context) *models.User {
 	cookie, err := c.Cookie("goigniter_auth")
 	if err != nil {
@@ -233,14 +260,16 @@ func GetSession(c *core.Context) *models.User {
 	}
 
 	var user models.User
-	if err := config.DB.Preload("Groups").First(&user, sessionData.UserID).Error; err != nil {
+	err = database.Table("users").Where("id", sessionData.UserID).First(&user)
+	if err != nil {
 		return nil
 	}
 
+	loadUserGroups(&user)
 	return &user
 }
 
-// ClearSession menghapus session cookie
+// ClearSession removes session cookie
 func ClearSession(c *core.Context) {
 	cookie := &http.Cookie{
 		Name:     "goigniter_auth",
@@ -254,7 +283,7 @@ func ClearSession(c *core.Context) {
 
 // --- JWT Functions (API) ---
 
-// GenerateJWT membuat JWT token
+// GenerateJWT creates a JWT token
 func GenerateJWT(user *models.User) (string, error) {
 	secret := os.Getenv("JWT_SECRET")
 	if secret == "" {
@@ -274,7 +303,7 @@ func GenerateJWT(user *models.User) (string, error) {
 	return token.SignedString([]byte(secret))
 }
 
-// ValidateJWT memvalidasi JWT token
+// ValidateJWT validates JWT token
 func ValidateJWT(tokenString string) (*models.User, error) {
 	secret := os.Getenv("JWT_SECRET")
 	if secret == "" {
@@ -295,16 +324,29 @@ func ValidateJWT(tokenString string) (*models.User, error) {
 	}
 
 	var user models.User
-	if err := config.DB.Preload("Groups").First(&user, claims.UserID).Error; err != nil {
+	err = database.Table("users").Where("id", claims.UserID).First(&user)
+	if err != nil {
 		return nil, ErrUserNotFound
 	}
 
+	loadUserGroups(&user)
 	return &user, nil
 }
 
 // --- Helper Functions ---
 
-// GetUser mengambil user dari context
+func loadUserGroups(user *models.User) {
+	var groups []models.Group
+	database.Query(`
+		SELECT g.id, g.name, g.description
+		FROM groups g
+		INNER JOIN users_groups ug ON g.id = ug.group_id
+		WHERE ug.user_id = ?
+	`, user.ID).Get(&groups)
+	user.Groups = groups
+}
+
+// GetUser retrieves user from context
 func GetUser(c *core.Context) *models.User {
 	if user, ok := c.Get("user").(*models.User); ok {
 		return user
@@ -321,12 +363,12 @@ func GetUser(c *core.Context) *models.User {
 	return GetSession(c)
 }
 
-// IsLoggedIn cek apakah user sudah login
+// IsLoggedIn checks if user is logged in
 func IsLoggedIn(c *core.Context) bool {
 	return GetUser(c) != nil
 }
 
-// InGroup cek apakah user ada di group tertentu
+// InGroup checks if user belongs to a group
 func InGroup(user *models.User, groupName string) bool {
 	if user == nil {
 		return false
@@ -339,7 +381,7 @@ func InGroup(user *models.User, groupName string) bool {
 	return false
 }
 
-// RequireAuth middleware - redirect jika belum login
+// RequireAuth middleware - redirect if not logged in
 func RequireAuth(c *core.Context) bool {
 	if !IsLoggedIn(c) {
 		c.Redirect(http.StatusFound, "/auth/login")
@@ -348,7 +390,7 @@ func RequireAuth(c *core.Context) bool {
 	return true
 }
 
-// RequireGroup cek login + group membership
+// RequireGroup checks login + group membership
 func RequireGroup(c *core.Context, groupName string) bool {
 	user := GetUser(c)
 	if user == nil {
@@ -370,15 +412,10 @@ func generateToken(length int) string {
 	return base64.URLEncoding.EncodeToString(b)[:length]
 }
 
-func stringPtr(s string) *string {
-	return &s
-}
-
 func logLoginAttempt(ipAddress, login string) {
-	attempt := models.LoginAttempt{
-		IPAddress: ipAddress,
-		Login:     login,
-		Time:      time.Now().Unix(),
-	}
-	config.DB.Create(&attempt)
+	database.Table("login_attempts").Insert(map[string]any{
+		"ip_address": ipAddress,
+		"login":      login,
+		"time":       time.Now().Unix(),
+	})
 }

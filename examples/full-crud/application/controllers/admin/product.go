@@ -3,11 +3,12 @@ package admin
 import (
 	"full-crud/application/libs"
 	"full-crud/application/models"
-	"full-crud/config"
 	"net/http"
 	"strconv"
+	"time"
 
 	"github.com/semutdev/goigniter/system/core"
+	"github.com/semutdev/goigniter/system/libraries/database"
 )
 
 func init() {
@@ -18,13 +19,22 @@ type Product struct {
 	core.Controller
 }
 
+// Routes defines custom routes for Product controller
+func (p *Product) Routes() map[string]string {
+	return map[string]string{
+		"Edit":   "edit/:id",
+		"Update": "update/:id",
+		"Delete": "delete/:id",
+	}
+}
+
 type ProductForm struct {
 	Name  string  `json:"name"`
 	Price float64 `json:"price"`
 	Stock int     `json:"stock"`
 }
 
-// DataTablesResponse format response untuk DataTables
+// DataTablesResponse format response for DataTables
 type DataTablesResponse struct {
 	Draw            int              `json:"draw"`
 	RecordsTotal    int64            `json:"recordsTotal"`
@@ -32,7 +42,7 @@ type DataTablesResponse struct {
 	Data            []models.Product `json:"data"`
 }
 
-// Index menampilkan halaman list product
+// Index displays the product list page
 func (p *Product) Index() {
 	if !libs.IsLoggedIn(p.Ctx) {
 		p.Ctx.Redirect(http.StatusSeeOther, "/auth/login")
@@ -50,7 +60,7 @@ func (p *Product) Index() {
 	p.Ctx.View("admin/inc/footer", data)
 }
 
-// Data mengembalikan JSON untuk DataTables
+// Data returns JSON for DataTables
 func (p *Product) Data() {
 	if !libs.IsLoggedIn(p.Ctx) {
 		p.Ctx.JSON(http.StatusUnauthorized, core.Map{"error": "Unauthorized"})
@@ -88,19 +98,21 @@ func (p *Product) Data() {
 	var totalRecords int64
 	var filteredRecords int64
 
-	config.DB.Model(&models.Product{}).Count(&totalRecords)
+	// Total records
+	totalRecords, _ = database.Table("products").Count()
 
-	query := config.DB.Model(&models.Product{})
+	// Filtered query
+	query := database.Table("products")
 	if search != "" {
 		query = query.Where("name LIKE ?", "%"+search+"%")
 	}
 
-	query.Count(&filteredRecords)
+	filteredRecords, _ = query.Count()
 
-	query.Order(orderColumn + " " + orderDir).
+	query.OrderBy(orderColumn, orderDir).
 		Offset(start).
 		Limit(length).
-		Find(&products)
+		Get(&products)
 
 	response := DataTablesResponse{
 		Draw:            draw,
@@ -112,7 +124,7 @@ func (p *Product) Data() {
 	p.Ctx.JSON(http.StatusOK, response)
 }
 
-// Add menampilkan form tambah product
+// Add displays the add product form
 func (p *Product) Add() {
 	if !libs.IsLoggedIn(p.Ctx) {
 		p.Ctx.Redirect(http.StatusSeeOther, "/auth/login")
@@ -130,7 +142,7 @@ func (p *Product) Add() {
 	p.Ctx.View("admin/inc/footer", data)
 }
 
-// Store menyimpan product baru
+// Store saves a new product
 func (p *Product) Store() {
 	if !libs.IsLoggedIn(p.Ctx) {
 		p.Ctx.Redirect(http.StatusSeeOther, "/auth/login")
@@ -164,18 +176,20 @@ func (p *Product) Store() {
 		return
 	}
 
-	product := models.Product{
-		Name:  name,
-		Price: price,
-		Stock: stock,
-	}
-	config.DB.Create(&product)
+	now := time.Now()
+	database.Table("products").Insert(map[string]any{
+		"name":       name,
+		"price":      price,
+		"stock":      stock,
+		"created_at": now,
+		"updated_at": now,
+	})
 
 	libs.SetFlash(p.Ctx, "success", "Product berhasil ditambahkan")
 	p.Ctx.Redirect(http.StatusSeeOther, "/admin/product/index")
 }
 
-// Edit menampilkan form edit product
+// Edit displays the edit product form
 func (p *Product) Edit() {
 	if !libs.IsLoggedIn(p.Ctx) {
 		p.Ctx.Redirect(http.StatusSeeOther, "/auth/login")
@@ -184,7 +198,8 @@ func (p *Product) Edit() {
 
 	id := p.Ctx.Param("id")
 	var product models.Product
-	if err := config.DB.First(&product, id).Error; err != nil {
+	err := database.Table("products").Where("id", id).First(&product)
+	if err != nil {
 		libs.SetFlash(p.Ctx, "error", "Product tidak ditemukan")
 		p.Ctx.Redirect(http.StatusSeeOther, "/admin/product/index")
 		return
@@ -201,12 +216,14 @@ func (p *Product) Edit() {
 		"Errors": map[string]string{},
 	}
 
+	println(data)
+
 	p.Ctx.View("admin/inc/header", data)
 	p.Ctx.View("admin/product/edit", data)
 	p.Ctx.View("admin/inc/footer", data)
 }
 
-// Update menyimpan perubahan product
+// Update saves product changes
 func (p *Product) Update() {
 	if !libs.IsLoggedIn(p.Ctx) {
 		p.Ctx.Redirect(http.StatusSeeOther, "/auth/login")
@@ -215,7 +232,8 @@ func (p *Product) Update() {
 
 	id := p.Ctx.Param("id")
 	var product models.Product
-	if err := config.DB.First(&product, id).Error; err != nil {
+	err := database.Table("products").Where("id", id).First(&product)
+	if err != nil {
 		libs.SetFlash(p.Ctx, "error", "Product tidak ditemukan")
 		p.Ctx.Redirect(http.StatusSeeOther, "/admin/product/index")
 		return
@@ -249,16 +267,18 @@ func (p *Product) Update() {
 		return
 	}
 
-	product.Name = name
-	product.Price = price
-	product.Stock = stock
-	config.DB.Save(&product)
+	database.Table("products").Where("id", id).Update(map[string]any{
+		"name":       name,
+		"price":      price,
+		"stock":      stock,
+		"updated_at": time.Now(),
+	})
 
 	libs.SetFlash(p.Ctx, "success", "Product berhasil diupdate")
 	p.Ctx.Redirect(http.StatusSeeOther, "/admin/product/index")
 }
 
-// Delete menghapus product
+// Delete removes a product
 func (p *Product) Delete() {
 	if !libs.IsLoggedIn(p.Ctx) {
 		p.Ctx.JSON(http.StatusUnauthorized, core.Map{"error": "Unauthorized"})
@@ -266,7 +286,8 @@ func (p *Product) Delete() {
 	}
 
 	id := p.Ctx.Param("id")
-	if err := config.DB.Delete(&models.Product{}, id).Error; err != nil {
+	err := database.Table("products").Where("id", id).Delete()
+	if err != nil {
 		p.Ctx.JSON(http.StatusInternalServerError, core.Map{"error": "Gagal menghapus product"})
 		return
 	}
