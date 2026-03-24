@@ -366,10 +366,21 @@ func (b *Builder) GetMap() ([]map[string]any, error) {
 	return scanRowsToMap(rows)
 }
 
-// First gets the first result.
+// First gets the first result into a single struct.
 func (b *Builder) First(dest any) error {
-	b.limitVal = 1
-	return b.Get(dest)
+	query, args := b.buildSelect()
+	// Add LIMIT 1 if not already set
+	if b.limitVal == 0 {
+		query += " LIMIT 1"
+	}
+	rows, err := b.db.execer().Query(query, args...)
+	if err != nil {
+		b.db.lastError = err
+		return err
+	}
+	defer rows.Close()
+
+	return scanRow(rows, dest)
 }
 
 // FirstMap gets the first result as map.
@@ -387,8 +398,12 @@ func (b *Builder) FirstMap() (map[string]any, error) {
 
 // Count returns the count of rows.
 func (b *Builder) Count() (int64, error) {
+	// Save original columns
+	originalColumns := b.columns
 	b.columns = []string{"COUNT(*) as count"}
 	query, args := b.buildSelect()
+	// Restore columns
+	b.columns = originalColumns
 
 	var count int64
 	err := b.db.execer().QueryRow(query, args...).Scan(&count)
@@ -401,8 +416,10 @@ func (b *Builder) Count() (int64, error) {
 
 // Sum returns the sum of a column.
 func (b *Builder) Sum(column string) (float64, error) {
+	originalColumns := b.columns
 	b.columns = []string{fmt.Sprintf("COALESCE(SUM(%s), 0) as sum", column)}
 	query, args := b.buildSelect()
+	b.columns = originalColumns
 
 	var sum float64
 	err := b.db.execer().QueryRow(query, args...).Scan(&sum)
@@ -415,8 +432,10 @@ func (b *Builder) Sum(column string) (float64, error) {
 
 // Avg returns the average of a column.
 func (b *Builder) Avg(column string) (float64, error) {
+	originalColumns := b.columns
 	b.columns = []string{fmt.Sprintf("COALESCE(AVG(%s), 0) as avg", column)}
 	query, args := b.buildSelect()
+	b.columns = originalColumns
 
 	var avg float64
 	err := b.db.execer().QueryRow(query, args...).Scan(&avg)
@@ -429,8 +448,10 @@ func (b *Builder) Avg(column string) (float64, error) {
 
 // Min returns the minimum value of a column.
 func (b *Builder) Min(column string) (float64, error) {
+	originalColumns := b.columns
 	b.columns = []string{fmt.Sprintf("MIN(%s) as min", column)}
 	query, args := b.buildSelect()
+	b.columns = originalColumns
 
 	var min float64
 	err := b.db.execer().QueryRow(query, args...).Scan(&min)
@@ -443,8 +464,10 @@ func (b *Builder) Min(column string) (float64, error) {
 
 // Max returns the maximum value of a column.
 func (b *Builder) Max(column string) (float64, error) {
+	originalColumns := b.columns
 	b.columns = []string{fmt.Sprintf("MAX(%s) as max", column)}
 	query, args := b.buildSelect()
+	b.columns = originalColumns
 
 	var max float64
 	err := b.db.execer().QueryRow(query, args...).Scan(&max)
