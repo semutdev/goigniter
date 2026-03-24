@@ -67,24 +67,7 @@ func (r *controllerRegistry) registerControllerRoutes(app *Application, basePath
 
 // resolveRoutePath returns the route path for a method (without HTTP method)
 func resolveRoutePath(basePath, methodName string) string {
-	switch methodName {
-	case "Index":
-		return "/" + basePath
-	case "Show":
-		return "/" + basePath + "/:id"
-	case "Create":
-		return "/" + basePath + "/create"
-	case "Store":
-		return "/" + basePath
-	case "Edit":
-		return "/" + basePath + "/:id/edit"
-	case "Update":
-		return "/" + basePath + "/:id"
-	case "Delete":
-		return "/" + basePath + "/:id"
-	default:
-		return "/" + basePath + "/" + strings.ToLower(methodName)
-	}
+	return "/" + basePath + "/" + strings.ToLower(methodName)
 }
 
 // resolveHTTPMethods returns allowed HTTP methods for a controller method
@@ -96,38 +79,12 @@ func resolveHTTPMethods(methodName string, allowedMethods map[string][]string) [
 		}
 	}
 
-	// Default based on method name
-	switch methodName {
-	case "Store":
-		return []string{"POST"}
-	case "Update":
-		return []string{"PUT", "POST"}
-	case "Delete":
-		return []string{"DELETE", "POST"}
-	default:
-		return []string{"GET", "POST"}
-	}
+	// Default: all methods allow GET and POST
+	return []string{"GET", "POST"}
 }
 
 func resolveRoute(basePath, methodName string) (httpMethod, routePath string) {
-	switch methodName {
-	case "Index":
-		return "GET", "/" + basePath
-	case "Show":
-		return "GET", "/" + basePath + "/:id"
-	case "Create":
-		return "GET", "/" + basePath + "/create"
-	case "Store":
-		return "POST", "/" + basePath
-	case "Edit":
-		return "GET", "/" + basePath + "/:id/edit"
-	case "Update":
-		return "PUT", "/" + basePath + "/:id"
-	case "Delete":
-		return "DELETE", "/" + basePath + "/:id"
-	default:
-		return "GET", "/" + basePath + "/" + strings.ToLower(methodName)
-	}
+	return "GET", "/" + basePath + "/" + strings.ToLower(methodName)
 }
 
 func isInternalMethod(name string) bool {
