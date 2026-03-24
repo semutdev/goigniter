@@ -5,7 +5,7 @@ import (
 	"log"
 	"os"
 
-	"full-crud/config"
+	"full-crud/application/config"
 	"full-crud/database"
 
 	// Import controllers for auto-register
@@ -68,7 +68,7 @@ func main() {
 
 	// Default route
 	app.GET("/", func(c *core.Context) error {
-		return c.Redirect(302, "/welcome")
+		return c.Redirect(302, "/welcome/index")
 	})
 
 	// Custom routes for auth with parameters

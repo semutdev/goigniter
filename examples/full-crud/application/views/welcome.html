@@ -30,7 +30,6 @@
         h1 {
             color: #fff;
             background-color: #73b9f4;
-            border-bottom: 1px solid #d0d0d0;
             font-size: 22px;
             font-weight: bold;
             margin: 0 0 14px 0;
@@ -89,10 +88,21 @@
             box-shadow: 0 0 8px #d0d0d0;
             border-radius: 4px;
         }
+
+        .nav{
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            background-color: #73b9f4;
+            padding: 0 10px;
+        }
         </style>
 </head>
 <body>
-    <h1>{{ .Title }} <img src="/static/logo.png" alt="logo-goigniter"> </h1>
+    <div class="nav">
+        <h1><img src="/static/logo.png" alt="logo-goigniter"> {{ .Title }}</h1>
+        <a style="text-align: right; color: white;" href="/auth/login"><u>Login</u></a>
+    </div>
     <div id="body">
         <p>The page you are looking at is being generated dynamically by Goigniter.</p>
 
@@ -101,9 +111,6 @@
 
         <p>The corresponding controller for this page is found at:</p>
         <code>application/controllers/welcome.go</code>
-
-        <p>Login to admin:</p>
-        <p><a href="/auth/login">Login</a></p>
     </div>
 </body>
 </html>
