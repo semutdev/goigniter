@@ -44,6 +44,7 @@ func (r *controllerRegistry) registerControllerRoutes(app *Application, basePath
 	controllerMiddleware := ctrl.Middleware()
 	methodMiddleware := ctrl.MiddlewareFor()
 	allowedMethods := ctrl.AllowedMethods()
+	customRoutes := ctrl.Routes()
 
 	for i := 0; i < t.NumMethod(); i++ {
 		method := t.Method(i)
@@ -53,7 +54,7 @@ func (r *controllerRegistry) registerControllerRoutes(app *Application, basePath
 			continue
 		}
 
-		routePath := resolveRoutePath(basePath, methodName)
+		routePath := resolveRoutePath(basePath, methodName, customRoutes)
 		httpMethods := resolveHTTPMethods(methodName, allowedMethods)
 
 		handler := createControllerHandler(factory, methodName, controllerMiddleware, methodMiddleware[methodName])
@@ -65,8 +66,21 @@ func (r *controllerRegistry) registerControllerRoutes(app *Application, basePath
 	}
 }
 
-// resolveRoutePath returns the route path for a method (without HTTP method)
-func resolveRoutePath(basePath, methodName string) string {
+// resolveRoutePath returns the route path for a method.
+// If a custom route is defined, it uses that; otherwise uses default pattern.
+func resolveRoutePath(basePath, methodName string, customRoutes map[string]string) string {
+	// Check if custom route is defined
+	if customRoutes != nil {
+		if route, ok := customRoutes[methodName]; ok {
+			// If route starts with /, it's absolute; otherwise relative to basePath
+			if len(route) > 0 && route[0] == '/' {
+				return route
+			}
+			return "/" + basePath + "/" + route
+		}
+	}
+
+	// Default pattern: /{controller}/{method}
 	return "/" + basePath + "/" + strings.ToLower(methodName)
 }
 
@@ -83,8 +97,8 @@ func resolveHTTPMethods(methodName string, allowedMethods map[string][]string) [
 	return []string{"GET", "POST"}
 }
 
-func resolveRoute(basePath, methodName string) (httpMethod, routePath string) {
-	return "GET", "/" + basePath + "/" + strings.ToLower(methodName)
+func resolveRoute(basePath, methodName string, customRoutes map[string]string) (httpMethod, routePath string) {
+	return "GET", resolveRoutePath(basePath, methodName, customRoutes)
 }
 
 func isInternalMethod(name string) bool {

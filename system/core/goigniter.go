@@ -27,6 +27,11 @@ type ControllerInterface interface {
 	// Return nil to use defaults (GET+POST for most methods).
 	// Example: map[string][]string{"Login": {"GET"}, "Dologin": {"POST"}}
 	AllowedMethods() map[string][]string
+
+	// Routes returns custom route patterns for controller methods.
+	// Return nil to use default routes (/{controller}/{method}).
+	// Example: map[string]string{"Detail": "product/detail/:id"}
+	Routes() map[string]string
 }
 
 // ControllerFactory is a function that creates a new controller instance.

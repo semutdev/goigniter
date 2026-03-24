@@ -28,6 +28,14 @@ func (c *Controller) AllowedMethods() map[string][]string {
 	return nil
 }
 
+// Routes returns custom route patterns for controller methods.
+// Override this to define custom routes with parameters.
+// Example: return map[string]string{"Detail": "product/detail/:id"}
+// Return nil to use default routes (/{controller}/{method})
+func (c *Controller) Routes() map[string]string {
+	return nil
+}
+
 // Loader provides helper methods for loading resources.
 type Loader struct {
 	controller *Controller
