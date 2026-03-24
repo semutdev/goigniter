@@ -78,17 +78,13 @@ Itu saja! Routes akan otomatis dibuat berdasarkan nama controller dan method.
 
 Berikut method names yang di-mapping secara otomatis ke HTTP routes:
 
-| Method | HTTP Methods | URL |
-|--------|--------------|-----|
+| Method | HTTP Methods | URL Default |
+|--------|--------------|-------------|
 | `Index()` | GET, POST | `/welcome` |
-| `Show()` | GET, POST | `/welcome/:id` |
+| `Store()` | POST | `/welcome/store` |
 | `Create()` | GET, POST | `/welcome/create` |
-| `Store()` | POST | `/welcome` |
-| `Edit()` | GET, POST | `/welcome/:id/edit` |
-| `Update()` | PUT, POST | `/welcome/:id` |
-| `Delete()` | DELETE, POST | `/welcome/:id` |
 
-Ini mengikuti konvensi RESTful dengan tambahan POST untuk form compatibility (seperti CI3).
+Untuk routes dengan parameter `:id` (seperti Edit, Update, Delete), gunakan method `Routes()` untuk mendefinisikan custom patterns. Lihat section [Routes - Custom Route Patterns](#routes---custom-route-patterns).
 
 ## Custom Method
 
@@ -145,16 +141,13 @@ func (a *Auth) Profile() {
 
 ### Default HTTP Methods
 
+Semua method controller menerima **GET dan POST** secara default (seperti CodeIgniter 3):
+
 | Method Name | Default HTTP Methods |
 |-------------|---------------------|
-| `Index()` | GET, POST |
-| `Show()` | GET, POST |
-| `Create()` | GET, POST |
-| `Store()` | POST only |
-| `Edit()` | GET, POST |
-| `Update()` | PUT, POST |
-| `Delete()` | DELETE, POST |
-| Method lainnya | GET, POST |
+| Semua method | GET, POST |
+
+Gunakan `AllowedMethods()` jika ingin membatasi HTTP methods tertentu.
 
 ### Perbandingan dengan CI3
 
@@ -182,6 +175,90 @@ func (a *Auth) AllowedMethods() map[string][]string {
 func (a *Auth) Dologin() {
     // Otomatis hanya menerima POST
     // GET akan return 404
+}
+```
+
+## Routes - Custom Route Patterns
+
+Secara default, semua method akan di-map ke `/{controller}/{method}`. Untuk custom route patterns dengan parameter (seperti `:id`), override method `Routes()`:
+
+```go
+type Product struct {
+    core.Controller
+}
+
+// Routes mendefinisikan custom route patterns
+func (p *Product) Routes() map[string]string {
+    return map[string]string{
+        "Edit":   "edit/:id",      // /product/edit/:id
+        "Update": "update/:id",    // /product/update/:id
+        "Delete": "delete/:id",    // /product/delete/:id
+        "Detail": "detail/:id",    // /product/detail/:id
+    }
+}
+```
+
+### Default vs Custom Routes
+
+| Method | Default Route | Custom Route |
+|--------|--------------|--------------|
+| `Index()` | `/product` | - |
+| `Edit()` | `/product/edit` | `/product/edit/:id` |
+| `Update()` | `/product/update` | `/product/update/:id` |
+| `Delete()` | `/product/delete` | `/product/delete/:id` |
+| `Detail()` | `/product/detail` | `/product/detail/:id` |
+
+### Absolute Routes
+
+Jika route dimulai dengan `/`, akan dianggap sebagai absolute path (tidak relative ke controller):
+
+```go
+func (p *Product) Routes() map[string]string {
+    return map[string]string{
+        "Detail": "/item/:id",           // Absolute: /item/:id
+        "Edit":   "edit/:id",            // Relative: /product/edit/:id
+    }
+}
+```
+
+### Contoh Lengkap dengan Routes
+
+```go
+type Product struct {
+    core.Controller
+}
+
+// Custom routes dengan parameter
+func (p *Product) Routes() map[string]string {
+    return map[string]string{
+        "Edit":   "edit/:id",
+        "Update": "update/:id",
+        "Delete": "delete/:id",
+    }
+}
+
+// GET /product/edit/:id
+func (p *Product) Edit() {
+    id := p.Ctx.Param("id")
+    product := getProductByID(id)
+    p.Ctx.View("product/edit", core.Map{
+        "Product": product,
+    })
+}
+
+// POST /product/update/:id
+func (p *Product) Update() {
+    id := p.Ctx.Param("id")
+    name := p.Ctx.FormValue("name")
+    updateProduct(id, name)
+    p.Ctx.Redirect(302, "/product")
+}
+
+// POST /product/delete/:id
+func (p *Product) Delete() {
+    id := p.Ctx.Param("id")
+    deleteProduct(id)
+    p.Ctx.JSON(200, core.Map{"success": true})
 }
 ```
 
@@ -292,6 +369,15 @@ type Product struct {
     core.Controller
 }
 
+// Custom routes untuk method dengan parameter :id
+func (p *Product) Routes() map[string]string {
+    return map[string]string{
+        "Edit":   "edit/:id",
+        "Update": "update/:id",
+        "Delete": "delete/:id",
+    }
+}
+
 // GET /product
 func (p *Product) Index() {
     products := getProductsFromDB()
@@ -300,31 +386,22 @@ func (p *Product) Index() {
     })
 }
 
-// GET /product/:id
-func (p *Product) Show() {
-    id := p.Ctx.Param("id")
-    product := getProductByID(id)
-    p.Ctx.View("products/show", core.Map{
-        "Product": product,
-    })
-}
-
 // GET /product/create
 func (p *Product) Create() {
     p.Ctx.View("products/create", core.Map{})
 }
 
-// POST /product
+// POST /product/store
 func (p *Product) Store() {
     name := p.Ctx.FormValue("name")
     price := p.Ctx.FormValue("price")
 
     saveProduct(name, price)
 
-    p.Ctx.Redirect(302, "/product")
+    p.Ctx.Redirect(302, "/product/index")
 }
 
-// GET /product/:id/edit
+// GET /product/edit/:id
 func (p *Product) Edit() {
     id := p.Ctx.Param("id")
     product := getProductByID(id)
@@ -333,7 +410,7 @@ func (p *Product) Edit() {
     })
 }
 
-// PUT /product/:id
+// POST /product/update/:id
 func (p *Product) Update() {
     id := p.Ctx.Param("id")
     name := p.Ctx.FormValue("name")
@@ -341,14 +418,14 @@ func (p *Product) Update() {
 
     updateProduct(id, name, price)
 
-    p.Ctx.Redirect(302, "/product")
+    p.Ctx.Redirect(302, "/product/index")
 }
 
-// DELETE /product/:id
+// POST /product/delete/:id
 func (p *Product) Delete() {
     id := p.Ctx.Param("id")
     deleteProduct(id)
-    p.Ctx.NoContent(204)
+    p.Ctx.JSON(200, core.Map{"success": true})
 }
 ```
 
