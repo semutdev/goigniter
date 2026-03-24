@@ -1,11 +1,6 @@
-{{define "admin/product/edit"}}
-    {{template "admin/layout" .}}
-{{end}}
-
-{{define "admin-content"}}
 <div class="d-flex justify-content-between flex-wrap flex-md-nowrap align-items-center pt-3 pb-2 mb-3 border-bottom">
     <h1 class="h2">{{ .Title }}</h1>
-    <a href="{{site_url "admin/product"}}" class="btn btn-secondary">
+    <a href="{{site_url "admin/product/index"}}" class="btn btn-secondary">
         <i class="bi bi-arrow-left"></i> Kembali
     </a>
 </div>
@@ -46,7 +41,7 @@
                     </div>
 
                     <div class="d-grid gap-2 d-md-flex justify-content-md-end">
-                        <a href="{{site_url "admin/product"}}" class="btn btn-secondary">Batal</a>
+                        <a href="{{site_url "admin/product/index"}}" class="btn btn-secondary">Batal</a>
                         <button type="submit" class="btn btn-primary">
                             <i class="bi bi-save"></i> Update
                         </button>
@@ -56,4 +51,3 @@
         </div>
     </div>
 </div>
-{{end}}

@@ -14,12 +14,16 @@ type Dashboard struct {
 	core.Controller
 }
 
-func (d *Dashboard) Index() {
-	if !libs.RequireGroup(d.Ctx, "admin") {
+func (this *Dashboard) Index() {
+	if !libs.RequireGroup(this.Ctx, "admin") {
 		return
 	}
 
-	d.Ctx.View("admin/dashboard", core.Map{
+	data := core.Map{
 		"Title": "Dashboard Admin",
-	})
+	}
+
+	this.Ctx.View("admin/inc/header", data)
+	this.Ctx.View("admin/dashboard", data)
+	this.Ctx.View("admin/inc/footer", data)
 }

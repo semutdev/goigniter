@@ -32,15 +32,15 @@ type RegisterForm struct {
 }
 
 // Login menampilkan form login
-func (a *Auth) Login() {
-	if libs.IsLoggedIn(a.Ctx) {
-		a.Ctx.Redirect(http.StatusFound, "/")
-		return
-	}
+func (this *Auth) Login() {
+	// if libs.IsLoggedIn(a.Ctx) {
+	// 	a.Ctx.Redirect(http.StatusFound, "/")
+	// 	return
+	// }
 
-	a.Ctx.View("auth/login", core.Map{
+	this.Ctx.View("auth/login", core.Map{
 		"Title":  "Login",
-		"Error":  a.Ctx.Query("error"),
+		"Error":  this.Ctx.Query("error"),
 		"Values": LoginForm{},
 	})
 }
@@ -73,7 +73,7 @@ func (a *Auth) Dologin() {
 	libs.SetSession(a.Ctx, user, rememberBool)
 
 	if libs.InGroup(user, "admin") {
-		a.Ctx.Redirect(http.StatusFound, "/admin/dashboard")
+		a.Ctx.Redirect(http.StatusFound, "/admin/dashboard/index")
 		return
 	}
 

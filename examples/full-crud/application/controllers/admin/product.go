@@ -39,11 +39,15 @@ func (p *Product) Index() {
 		return
 	}
 
-	p.Ctx.View("admin/product/index", core.Map{
+	data := core.Map{
 		"Title":   "Product Management",
 		"Success": libs.GetFlash(p.Ctx, "success"),
 		"Error":   libs.GetFlash(p.Ctx, "error"),
-	})
+	}
+
+	p.Ctx.View("admin/inc/header", data)
+	p.Ctx.View("admin/product/index", data)
+	p.Ctx.View("admin/inc/footer", data)
 }
 
 // Data mengembalikan JSON untuk DataTables
@@ -115,11 +119,15 @@ func (p *Product) Add() {
 		return
 	}
 
-	p.Ctx.View("admin/product/add", core.Map{
+	data := core.Map{
 		"Title":  "Tambah Product",
 		"Values": ProductForm{},
 		"Errors": map[string]string{},
-	})
+	}
+
+	p.Ctx.View("admin/inc/header", data)
+	p.Ctx.View("admin/product/add", data)
+	p.Ctx.View("admin/inc/footer", data)
 }
 
 // Store menyimpan product baru
@@ -145,11 +153,14 @@ func (p *Product) Store() {
 	}
 
 	if len(errors) > 0 {
-		p.Ctx.View("admin/product/add", core.Map{
+		data := core.Map{
 			"Title":  "Tambah Product",
 			"Values": ProductForm{Name: name, Price: price, Stock: stock},
 			"Errors": errors,
-		})
+		}
+		p.Ctx.View("admin/inc/header", data)
+		p.Ctx.View("admin/product/add", data)
+		p.Ctx.View("admin/inc/footer", data)
 		return
 	}
 
@@ -161,7 +172,7 @@ func (p *Product) Store() {
 	config.DB.Create(&product)
 
 	libs.SetFlash(p.Ctx, "success", "Product berhasil ditambahkan")
-	p.Ctx.Redirect(http.StatusSeeOther, "/admin/product")
+	p.Ctx.Redirect(http.StatusSeeOther, "/admin/product/index")
 }
 
 // Edit menampilkan form edit product
@@ -175,11 +186,11 @@ func (p *Product) Edit() {
 	var product models.Product
 	if err := config.DB.First(&product, id).Error; err != nil {
 		libs.SetFlash(p.Ctx, "error", "Product tidak ditemukan")
-		p.Ctx.Redirect(http.StatusSeeOther, "/admin/product")
+		p.Ctx.Redirect(http.StatusSeeOther, "/admin/product/index")
 		return
 	}
 
-	p.Ctx.View("admin/product/edit", core.Map{
+	data := core.Map{
 		"Title":   "Edit Product",
 		"Product": product,
 		"Values": ProductForm{
@@ -188,7 +199,11 @@ func (p *Product) Edit() {
 			Stock: product.Stock,
 		},
 		"Errors": map[string]string{},
-	})
+	}
+
+	p.Ctx.View("admin/inc/header", data)
+	p.Ctx.View("admin/product/edit", data)
+	p.Ctx.View("admin/inc/footer", data)
 }
 
 // Update menyimpan perubahan product
@@ -202,7 +217,7 @@ func (p *Product) Update() {
 	var product models.Product
 	if err := config.DB.First(&product, id).Error; err != nil {
 		libs.SetFlash(p.Ctx, "error", "Product tidak ditemukan")
-		p.Ctx.Redirect(http.StatusSeeOther, "/admin/product")
+		p.Ctx.Redirect(http.StatusSeeOther, "/admin/product/index")
 		return
 	}
 
@@ -222,12 +237,15 @@ func (p *Product) Update() {
 	}
 
 	if len(errors) > 0 {
-		p.Ctx.View("admin/product/edit", core.Map{
+		data := core.Map{
 			"Title":   "Edit Product",
 			"Product": product,
 			"Values":  ProductForm{Name: name, Price: price, Stock: stock},
 			"Errors":  errors,
-		})
+		}
+		p.Ctx.View("admin/inc/header", data)
+		p.Ctx.View("admin/product/edit", data)
+		p.Ctx.View("admin/inc/footer", data)
 		return
 	}
 
@@ -237,7 +255,7 @@ func (p *Product) Update() {
 	config.DB.Save(&product)
 
 	libs.SetFlash(p.Ctx, "success", "Product berhasil diupdate")
-	p.Ctx.Redirect(http.StatusSeeOther, "/admin/product")
+	p.Ctx.Redirect(http.StatusSeeOther, "/admin/product/index")
 }
 
 // Delete menghapus product
