@@ -104,7 +104,7 @@ func (p *Product) Data() {
 	// Filtered query
 	query := database.Table("products")
 	if search != "" {
-		query = query.Where("name LIKE ?", "%"+search+"%")
+		query = query.Where("name", "LIKE", "%"+search+"%")
 	}
 
 	filteredRecords, _ = query.Count()
