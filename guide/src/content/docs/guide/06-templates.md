@@ -395,4 +395,8 @@ c.Ctx.View("layout", core.Map{
 
 ---
 
-Selamat! Kamu sudah menguasai dasar-dasar GoIgniter. Untuk contoh aplikasi lengkap, lihat folder `examples/` di repository.
+Selamat! Kamu sudah menguasai dasar-dasar GoIgniter.
+
+Untuk debugging di controller, gunakan [Debug Helper](/guide/09-helpers) untuk inspect data.
+
+Untuk contoh aplikasi lengkap, lihat folder `examples/` di repository.
