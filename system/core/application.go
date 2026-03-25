@@ -1,12 +1,14 @@
 package core
 
 import (
+	"fmt"
 	"html/template"
 	"io"
 	"net/http"
 	"os"
 	"path"
 	"path/filepath"
+	"runtime"
 	"strings"
 	"sync"
 )
@@ -162,7 +164,49 @@ func (app *Application) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 
 // Run starts the HTTP server on the given address.
 func (app *Application) Run(addr string) error {
+	// Print banner automatically
+	printBanner(addr)
 	return http.ListenAndServe(addr, app)
+}
+
+// printBanner prints the startup banner
+func printBanner(addr string) {
+	// Color codes
+	cyan := "\033[36m"
+	green := "\033[32m"
+	yellow := "\033[33m"
+	blue := "\033[34m"
+	bold := "\033[1m"
+	reset := "\033[0m"
+
+	// ASCII Art Logo
+	logo := `
+                   ++
+                   + +
+                  +   +
+                ++    +
+              ++     +++++
+             ++     +++* ++
+            ++            ++
+           ++         +    +
+           ++        +++   +
+            ++     ++  +  ++
+             ++       ++++
+                +++ *+*+
+                   +
+`
+
+	fmt.Printf("%s%s", cyan, logo)
+	fmt.Printf("%s%sGoIgniter%s v%s%s\n", bold, green, cyan, Version, reset)
+	fmt.Printf("%s⚡ High Performance Web Framework for Go%s\n", yellow, reset)
+	fmt.Printf("%s%s%s\n", blue, Website, reset)
+	fmt.Println()
+
+	// Print server info
+	fmt.Printf("  Go Version: %s\n", runtime.Version())
+	fmt.Printf("  Platform:   %s/%s\n", runtime.GOOS, runtime.GOARCH)
+	fmt.Printf("  Server:     http://localhost%s\n", addr)
+	fmt.Println()
 }
 
 // SetRenderer sets the template renderer for the application.
