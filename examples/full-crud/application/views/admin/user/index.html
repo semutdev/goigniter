@@ -1,0 +1,189 @@
+<div class="d-flex justify-content-between flex-wrap flex-md-nowrap align-items-center pt-3 pb-2 mb-3 border-bottom">
+    <h1 class="h2">{{ .Title }}</h1>
+    <button class="btn btn-primary" hx-get="{{site_url "admin/user/add"}}" hx-target="#modalContent" data-bs-toggle="modal" data-bs-target="#userModal">
+        <i class="bi bi-person-plus"></i> Tambah User
+    </button>
+</div>
+
+{{if .Success}}
+<div class="alert alert-success alert-dismissible fade show" role="alert">
+    {{.Success}}
+    <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
+</div>
+{{end}}
+
+{{if .Error}}
+<div class="alert alert-danger alert-dismissible fade show" role="alert">
+    {{.Error}}
+    <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
+</div>
+{{end}}
+
+<div class="card">
+    <div class="card-body">
+        <table id="userTable" class="table table-striped table-hover" style="width:100%">
+            <thead>
+                <tr>
+                    <th>ID</th>
+                    <th>Nama</th>
+                    <th>Email</th>
+                    <th>Company</th>
+                    <th>Role</th>
+                    <th>Status</th>
+                    <th>Actions</th>
+                </tr>
+            </thead>
+            <tbody>
+            {{range .Users}}
+            <tr>
+                <td>{{.ID}}</td>
+                <td>{{.FullName}}</td>
+                <td>{{.Email}}</td>
+                <td>{{if .Company}}{{.Company}}{{else}}-{{end}}</td>
+                <td>
+                    {{range $i, $g := .Groups}}
+                        {{if $i}}, {{end}}
+                        <span class="badge bg-primary">{{$g.Name}}</span>
+                    {{else}}
+                        <span class="badge bg-secondary">No Role</span>
+                    {{end}}
+                </td>
+                <td>
+                    {{if .Active}}
+                        <span class="badge bg-success">Active</span>
+                    {{else}}
+                        <span class="badge bg-warning text-dark">Inactive</span>
+                    {{end}}
+                </td>
+                <td>
+                    <a href="{{site_url "admin/user/edit/"}}{{.ID}}" class="btn btn-sm btn-warning">
+                        <i class="bi bi-pencil"></i>
+                    </a>
+                    <button class="btn btn-sm btn-{{if .Active}}secondary{{else}}success{{end}} btn-toggle" data-id="{{.ID}}" data-active="{{.Active}}">
+                        {{if .Active}}
+                        <i class="bi bi-x-circle"></i>
+                        {{else}}
+                        <i class="bi bi-check-circle"></i>
+                        {{end}}
+                    </button>
+                    <button class="btn btn-sm btn-danger btn-delete" data-id="{{.ID}}" data-name="{{.FullName}}">
+                        <i class="bi bi-trash"></i>
+                    </button>
+                </td>
+            </tr>
+            {{end}}
+            </tbody>
+        </table>
+    </div>
+</div>
+
+<!-- User Modal -->
+<div class="modal fade" id="userModal" tabindex="-1">
+    <div class="modal-dialog modal-lg">
+        <div class="modal-content" id="modalContent">
+            <!-- Content loaded via HTMX -->
+        </div>
+    </div>
+</div>
+
+<!-- Delete Confirmation Modal -->
+<div class="modal fade" id="deleteModal" tabindex="-1">
+    <div class="modal-dialog">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title">Konfirmasi Hapus</h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+            </div>
+            <div class="modal-body">
+                <p>Apakah Anda yakin ingin menghapus user <strong id="deleteUserName"></strong>?</p>
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Batal</button>
+                <button type="button" class="btn btn-danger" id="confirmDelete">Hapus</button>
+            </div>
+        </div>
+    </div>
+</div>
+
+<script>
+$(document).ready(function() {
+    // Initialize DataTable (client-side)
+    var table = $('#userTable').DataTable({
+        order: [[0, 'desc']],
+        language: {
+            search: "Cari:",
+            lengthMenu: "Tampilkan _MENU_ data",
+            info: "Menampilkan _START_ - _END_ dari _TOTAL_ data",
+            infoEmpty: "Tidak ada data",
+            infoFiltered: "(disaring dari _MAX_ total data)",
+            paginate: {
+                first: "Pertama",
+                last: "Terakhir",
+                next: "Selanjutnya",
+                previous: "Sebelumnya"
+            }
+        }
+    });
+
+    // Reset form when modal is closed
+    $('#userModal').on('hidden.bs.modal', function () {
+        $('#modalContent').html('');
+    });
+
+    // Toggle active status
+    $('#userTable').on('click', '.btn-toggle', function() {
+        var btn = $(this);
+        var userId = btn.data('id');
+        var currentActive = btn.data('active');
+
+        $.ajax({
+            url: '{{site_url "admin/user/activate/"}}' + userId,
+            type: 'POST',
+            success: function(response) {
+                location.reload();
+            },
+            error: function(xhr) {
+                alert('Gagal mengubah status user');
+            }
+        });
+    });
+
+    // Delete button handler
+    var deleteId = null;
+    var deleteModal = new bootstrap.Modal(document.getElementById('deleteModal'));
+
+    $('#userTable').on('click', '.btn-delete', function() {
+        deleteId = $(this).data('id');
+        $('#deleteUserName').text($(this).data('name'));
+        deleteModal.show();
+    });
+
+    $('#confirmDelete').on('click', function() {
+        if (deleteId) {
+            $.ajax({
+                url: '{{site_url "admin/user/delete/"}}' + deleteId,
+                type: 'POST',
+                success: function(response) {
+                    deleteModal.hide();
+                    table.row('[data-id="' + deleteId + '"]').remove().draw();
+                    var alertHtml = `
+                        <div class="alert alert-success alert-dismissible fade show" role="alert">
+                            User berhasil dihapus
+                            <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
+                        </div>
+                    `;
+                    $('.border-bottom').after(alertHtml);
+                },
+                error: function(xhr) {
+                    deleteModal.hide();
+                    var errorMsg = 'Gagal menghapus user';
+                    if (xhr.responseJSON && xhr.responseJSON.error) {
+                        errorMsg = xhr.responseJSON.error;
+                    }
+                    alert(errorMsg);
+                }
+            });
+        }
+    });
+});
+</script>
