@@ -240,9 +240,12 @@ func (c *Context) View(name string, data Map) error {
 	if c.app == nil || c.app.renderer == nil {
 		return c.HTML(200, "Template engine not configured")
 	}
-	c.Response.Header().Set("Content-Type", "text/html; charset=utf-8")
-	c.Response.WriteHeader(200)
-	c.written = true
+	// Only write header once (for multiple View() calls pattern)
+	if !c.written {
+		c.Response.Header().Set("Content-Type", "text/html; charset=utf-8")
+		c.Response.WriteHeader(200)
+		c.written = true
+	}
 	return c.app.renderer.Render(c.Response, name, data)
 }
 
@@ -250,9 +253,12 @@ func (c *Context) ViewWithCode(code int, name string, data Map) error {
 	if c.app == nil || c.app.renderer == nil {
 		return c.HTML(code, "Template engine not configured")
 	}
-	c.Response.Header().Set("Content-Type", "text/html; charset=utf-8")
-	c.Response.WriteHeader(code)
-	c.written = true
+	// Only write header once (for multiple View() calls pattern)
+	if !c.written {
+		c.Response.Header().Set("Content-Type", "text/html; charset=utf-8")
+		c.Response.WriteHeader(code)
+		c.written = true
+	}
 	return c.app.renderer.Render(c.Response, name, data)
 }
 

@@ -103,7 +103,7 @@ func scanRows(rows *sql.Rows, dest any) error {
 	return rows.Err()
 }
 
-// scanRow scans a single row into a struct.
+// scanRow scans a single row into a struct or primitive type.
 func scanRow(rows *sql.Rows, dest any) error {
 	destValue := reflect.ValueOf(dest)
 	if destValue.Kind() != reflect.Ptr {
@@ -128,6 +128,14 @@ func scanRow(rows *sql.Rows, dest any) error {
 
 	if !rows.Next() {
 		return sql.ErrNoRows
+	}
+
+	// Handle primitive types (int, int64, string, float64, bool, etc.)
+	if elemType.Kind() != reflect.Struct {
+		if len(columns) > 0 {
+			return rows.Scan(dest)
+		}
+		return fmt.Errorf("database: no columns to scan")
 	}
 
 	scanDest := makeScanDest(elemValue, columns)
