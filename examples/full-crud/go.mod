@@ -7,6 +7,7 @@ require (
 	github.com/joho/godotenv v1.5.1
 	github.com/semutdev/goigniter v0.1.1
 	golang.org/x/crypto v0.46.0
+	golang.org/x/image v0.18.0
 	gopkg.in/gomail.v2 v2.0.0-20160411212932-81ebce5c23df
 )
 

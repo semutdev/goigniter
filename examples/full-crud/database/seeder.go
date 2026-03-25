@@ -72,6 +72,7 @@ func createTables(db *database.DB) {
 			name VARCHAR(255) NOT NULL,
 			price DECIMAL(15,2) NOT NULL,
 			stock INT DEFAULT 0,
+			image VARCHAR(255) DEFAULT '',
 			created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
 			updated_at DATETIME DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP
 		) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4`,
@@ -81,6 +82,30 @@ func createTables(db *database.DB) {
 		_, err := db.Exec(sql)
 		if err != nil {
 			log.Printf("Error creating table: %v\n", err)
+		}
+	}
+
+	// Run migrations for existing tables
+	runMigrations(db)
+}
+
+func runMigrations(db *database.DB) {
+	// Add image column to products table if not exists
+	var imageColumnExists int64
+	db.Query(`
+		SELECT COUNT(*)
+		FROM information_schema.COLUMNS
+		WHERE TABLE_SCHEMA = DATABASE()
+		AND TABLE_NAME = 'products'
+		AND COLUMN_NAME = 'image'
+	`).Get(&imageColumnExists)
+
+	if imageColumnExists == 0 {
+		_, err := db.Exec("ALTER TABLE products ADD COLUMN image VARCHAR(255) DEFAULT '' AFTER stock")
+		if err != nil {
+			log.Printf("Error adding image column: %v\n", err)
+		} else {
+			log.Println("Added image column to products table")
 		}
 	}
 }

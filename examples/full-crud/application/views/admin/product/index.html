@@ -25,6 +25,7 @@
             <thead>
                 <tr>
                     <th>No</th>
+                    <th>Gambar</th>
                     <th>Nama</th>
                     <th>Harga</th>
                     <th>Stock</th>
@@ -71,14 +72,29 @@ $(document).ready(function() {
                 searchable: false,
                 orderable: false,
                 targets: 0
+            },
+            {
+                searchable: false,
+                orderable: false,
+                targets: 1
             }
         ],
         columns: [
-            { 
+            {
                 data: 'id',
                 render: function(data, type, row, meta) {
-                    return meta.row + 1; 
-                } 
+                    return meta.row + 1;
+                }
+            },
+            {
+                data: 'image',
+                orderable: false,
+                render: function(data, type, row) {
+                    if (data) {
+                        return '<img src="{{base_url "/static/uploads/products/thumb_"}}' + data + '" class="img-thumbnail" style="max-height: 50px; max-width: 50px;">';
+                    }
+                    return '<span class="text-muted">-</span>';
+                }
             },
             { data: 'name' },
             {
@@ -109,7 +125,7 @@ $(document).ready(function() {
                 }
             }
         ],
-        order: [[0, 'desc']],
+        order: [[2, 'asc']],
         language: {
             processing: "Memuat...",
             search: "Cari:",
@@ -144,7 +160,6 @@ $(document).ready(function() {
                 success: function(response) {
                     deleteModal.hide();
                     table.ajax.reload();
-                    // Show success alert
                     var alertHtml = `
                         <div class="alert alert-success alert-dismissible fade show" role="alert">
                             Product berhasil dihapus

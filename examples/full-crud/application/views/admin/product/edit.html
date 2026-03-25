@@ -6,38 +6,82 @@
 </div>
 
 <div class="row">
-    <div class="col-md-6">
+    <div class="col-md-8">
         <div class="card">
             <div class="card-body">
-                <form method="POST" action="{{site_url "admin/product/update/"}}{{.Product.ID}}">
-                    <div class="mb-3">
-                        <label for="name" class="form-label">Nama Product</label>
-                        <input type="text" class="form-control {{if .Errors.Name}}is-invalid{{end}}"
-                            id="name" name="name" value="{{.Values.Name}}" required>
-                        {{if .Errors.Name}}
-                        <div class="invalid-feedback">{{.Errors.Name}}</div>
-                        {{end}}
+                <form method="POST" action="{{site_url "admin/product/update/"}}{{.Product.ID}}" enctype="multipart/form-data">
+                    <div class="row">
+                        <div class="col-md-8">
+                            <div class="mb-3">
+                                <label for="name" class="form-label">Nama Product</label>
+                                <input type="text" class="form-control {{if .Errors.Name}}is-invalid{{end}}"
+                                    id="name" name="name" value="{{.Values.Name}}" required>
+                                {{if .Errors.Name}}
+                                <div class="invalid-feedback">{{.Errors.Name}}</div>
+                                {{end}}
+                            </div>
+                        </div>
                     </div>
 
-                    <div class="mb-3">
-                        <label for="price" class="form-label">Harga</label>
-                        <div class="input-group">
-                            <span class="input-group-text">Rp</span>
-                            <input type="number" class="form-control {{if .Errors.Price}}is-invalid{{end}}"
-                                id="price" name="price" value="{{printf "%.0f" .Values.Price}}" required>
-                            {{if .Errors.Price}}
-                            <div class="invalid-feedback">{{.Errors.Price}}</div>
-                            {{end}}
+                    <div class="row">
+                        <div class="col-md-4">
+                            <div class="mb-3">
+                                <label for="price" class="form-label">Harga</label>
+                                <div class="input-group">
+                                    <span class="input-group-text">Rp</span>
+                                    <input type="number" class="form-control {{if .Errors.Price}}is-invalid{{end}}"
+                                        id="price" name="price" value="{{printf "%.0f" .Values.Price}}" required>
+                                </div>
+                                {{if .Errors.Price}}
+                                <div class="text-danger small">{{.Errors.Price}}</div>
+                                {{end}}
+                            </div>
+                        </div>
+                        <div class="col-md-4">
+                            <div class="mb-3">
+                                <label for="stock" class="form-label">Stock</label>
+                                <input type="number" class="form-control {{if .Errors.Stock}}is-invalid{{end}}"
+                                    id="stock" name="stock" value="{{.Values.Stock}}" min="0" required>
+                                {{if .Errors.Stock}}
+                                <div class="invalid-feedback">{{.Errors.Stock}}</div>
+                                {{end}}
+                            </div>
                         </div>
                     </div>
 
                     <div class="mb-3">
-                        <label for="stock" class="form-label">Stock</label>
-                        <input type="number" class="form-control {{if .Errors.Stock}}is-invalid{{end}}"
-                            id="stock" name="stock" value="{{.Values.Stock}}" min="0" required>
-                        {{if .Errors.Stock}}
-                        <div class="invalid-feedback">{{.Errors.Stock}}</div>
+                        <label for="image" class="form-label">Gambar Product</label>
+                        <input type="file" class="form-control {{if .Errors.Image}}is-invalid{{end}}"
+                            id="image" name="image" accept="image/*">
+                        {{if .Errors.Image}}
+                        <div class="invalid-feedback">{{.Errors.Image}}</div>
+                        {{else}}
+                        <div class="form-text">Format: JPG, PNG, GIF, WEBP. Maks: 2MB</div>
                         {{end}}
+                    </div>
+
+                    {{if .Values.Image}}
+                    <div class="mb-3">
+                        <label class="form-label">Gambar Saat Ini</label>
+                        <div class="d-flex align-items-center gap-3">
+                            <img src="{{base_url "/static/uploads/products/thumb_"}}{{.Values.Image}}"
+                                alt="Current Image" class="img-thumbnail" style="max-height: 100px;"
+                                id="currentImage">
+                            <div class="form-check">
+                                <input class="form-check-input" type="checkbox" name="remove_image" value="1" id="removeImage">
+                                <label class="form-check-label text-danger" for="removeImage">
+                                    Hapus gambar ini
+                                </label>
+                            </div>
+                        </div>
+                    </div>
+                    {{end}}
+
+                    <div class="mb-3" id="imagePreview" style="display: none;">
+                        <label class="form-label">Preview Gambar Baru</label>
+                        <div>
+                            <img id="previewImg" src="" alt="Preview" class="img-thumbnail" style="max-height: 200px;">
+                        </div>
                     </div>
 
                     <div class="d-grid gap-2 d-md-flex justify-content-md-end">
@@ -51,3 +95,26 @@
         </div>
     </div>
 </div>
+
+<script>
+document.getElementById('image').addEventListener('change', function(e) {
+    const file = e.target.files[0];
+    if (file) {
+        const reader = new FileReader();
+        reader.onload = function(e) {
+            document.getElementById('previewImg').src = e.target.result;
+            document.getElementById('imagePreview').style.display = 'block';
+        }
+        reader.readAsDataURL(file);
+    } else {
+        document.getElementById('imagePreview').style.display = 'none';
+    }
+});
+
+document.getElementById('removeImage').addEventListener('change', function(e) {
+    const currentImage = document.getElementById('currentImage');
+    if (currentImage) {
+        currentImage.style.opacity = e.target.checked ? '0.3' : '1';
+    }
+});
+</script>

@@ -7,6 +7,7 @@ go 1.24.8
 
 require (
 	github.com/go-sql-driver/mysql v1.9.3
+	golang.org/x/image v0.18.0
 	modernc.org/sqlite v1.34.5
 )
 

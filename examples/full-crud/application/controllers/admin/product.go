@@ -4,11 +4,15 @@ import (
 	"full-crud/application/libs"
 	"full-crud/application/models"
 	"net/http"
+	"os"
+	"path/filepath"
 	"strconv"
+	"strings"
 	"time"
 
 	"github.com/semutdev/goigniter/system/core"
 	"github.com/semutdev/goigniter/system/libraries/database"
+	"github.com/semutdev/goigniter/system/libraries/upload"
 )
 
 func init() {
@@ -32,6 +36,7 @@ type ProductForm struct {
 	Name  string  `json:"name"`
 	Price float64 `json:"price"`
 	Stock int     `json:"stock"`
+	Image string  `json:"image"`
 }
 
 // DataTablesResponse format response for DataTables
@@ -40,6 +45,17 @@ type DataTablesResponse struct {
 	RecordsTotal    int64            `json:"recordsTotal"`
 	RecordsFiltered int64            `json:"recordsFiltered"`
 	Data            []models.Product `json:"data"`
+}
+
+// uploadConfig returns default upload configuration for product images
+func uploadConfig() upload.Config {
+	return upload.Config{
+		UploadPath:   "./public/uploads/products",
+		AllowedTypes: "jpg|jpeg|png|gif|webp",
+		MaxSize:      2048, // 2MB
+		FileName:     "timestamp",
+		CreateDirs:   true,
+	}
 }
 
 // Index displays the product list page
@@ -164,6 +180,38 @@ func (p *Product) Store() {
 		errors["Price"] = "Harga harus lebih dari 0"
 	}
 
+	// Handle image upload
+	var imageFilename string
+	file, header, err := p.Ctx.Request.FormFile("image")
+	if err == nil && header != nil {
+		file.Close() // Close it, upload library will reopen
+
+		uploader := upload.New(uploadConfig())
+		result, err := uploader.Do("image", p.Ctx.Request)
+		if err != nil {
+			if err == upload.ErrInvalidType {
+				errors["Image"] = "Tipe file tidak didukung (hanya jpg, png, gif, webp)"
+			} else if err == upload.ErrFileTooBig {
+				errors["Image"] = "Ukuran file terlalu besar (max 2MB)"
+			} else {
+				errors["Image"] = "Gagal mengupload gambar"
+			}
+		} else {
+			imageFilename = result.FileName
+
+			// Create thumbnail (optional)
+			imgProcessor := upload.NewImageProcessor(upload.ImageConfig{
+				Source:              result.FilePath,
+				CreateThumbnail:     true,
+				ThumbnailPrefix:     "thumb_",
+				ThumbnailWidth:      150,
+				ThumbnailHeight:     150,
+				MaintainAspectRatio: true,
+			})
+			imgProcessor.Resize()
+		}
+	}
+
 	if len(errors) > 0 {
 		data := core.Map{
 			"Title":  "Tambah Product",
@@ -181,6 +229,7 @@ func (p *Product) Store() {
 		"name":       name,
 		"price":      price,
 		"stock":      stock,
+		"image":      imageFilename,
 		"created_at": now,
 		"updated_at": now,
 	})
@@ -212,11 +261,10 @@ func (p *Product) Edit() {
 			Name:  product.Name,
 			Price: product.Price,
 			Stock: product.Stock,
+			Image: product.Image,
 		},
 		"Errors": map[string]string{},
 	}
-
-	println(data)
 
 	p.Ctx.View("admin/inc/header", data)
 	p.Ctx.View("admin/product/edit", data)
@@ -242,6 +290,7 @@ func (p *Product) Update() {
 	name := p.Ctx.FormValue("name")
 	priceStr := p.Ctx.FormValue("price")
 	stockStr := p.Ctx.FormValue("stock")
+	removeImage := p.Ctx.FormValue("remove_image") == "1"
 
 	price, _ := strconv.ParseFloat(priceStr, 64)
 	stock, _ := strconv.Atoi(stockStr)
@@ -254,11 +303,52 @@ func (p *Product) Update() {
 		errors["Price"] = "Harga harus lebih dari 0"
 	}
 
+	// Handle image upload
+	imageFilename := product.Image
+	file, header, err := p.Ctx.Request.FormFile("image")
+	if err == nil && header != nil {
+		file.Close()
+
+		uploader := upload.New(uploadConfig())
+		result, err := uploader.Do("image", p.Ctx.Request)
+		if err != nil {
+			if err == upload.ErrInvalidType {
+				errors["Image"] = "Tipe file tidak didukung (hanya jpg, png, gif, webp)"
+			} else if err == upload.ErrFileTooBig {
+				errors["Image"] = "Ukuran file terlalu besar (max 2MB)"
+			} else {
+				errors["Image"] = "Gagal mengupload gambar"
+			}
+		} else {
+			// Delete old image if exists
+			if product.Image != "" {
+				deleteProductImage(product.Image)
+			}
+
+			imageFilename = result.FileName
+
+			// Create thumbnail
+			imgProcessor := upload.NewImageProcessor(upload.ImageConfig{
+				Source:              result.FilePath,
+				CreateThumbnail:     true,
+				ThumbnailPrefix:     "thumb_",
+				ThumbnailWidth:      150,
+				ThumbnailHeight:     150,
+				MaintainAspectRatio: true,
+			})
+			imgProcessor.Resize()
+		}
+	} else if removeImage && product.Image != "" {
+		// Remove existing image
+		deleteProductImage(product.Image)
+		imageFilename = ""
+	}
+
 	if len(errors) > 0 {
 		data := core.Map{
 			"Title":   "Edit Product",
 			"Product": product,
-			"Values":  ProductForm{Name: name, Price: price, Stock: stock},
+			"Values":  ProductForm{Name: name, Price: price, Stock: stock, Image: product.Image},
 			"Errors":  errors,
 		}
 		p.Ctx.View("admin/inc/header", data)
@@ -271,6 +361,7 @@ func (p *Product) Update() {
 		"name":       name,
 		"price":      price,
 		"stock":      stock,
+		"image":      imageFilename,
 		"updated_at": time.Now(),
 	})
 
@@ -286,6 +377,16 @@ func (p *Product) Delete() {
 	}
 
 	id := p.Ctx.Param("id")
+
+	// Get product to delete image
+	var product models.Product
+	database.Table("products").Where("id", id).First(&product)
+
+	// Delete image files
+	if product.Image != "" {
+		deleteProductImage(product.Image)
+	}
+
 	err := database.Table("products").Where("id", id).Delete()
 	if err != nil {
 		p.Ctx.JSON(http.StatusInternalServerError, core.Map{"error": "Gagal menghapus product"})
@@ -293,4 +394,23 @@ func (p *Product) Delete() {
 	}
 
 	p.Ctx.JSON(http.StatusOK, core.Map{"message": "Product berhasil dihapus"})
+}
+
+// deleteProductImage deletes product image and thumbnail
+func deleteProductImage(filename string) {
+	if filename == "" {
+		return
+	}
+
+	uploadPath := "./public/uploads/products"
+	imagePath := filepath.Join(uploadPath, filename)
+	thumbPath := filepath.Join(uploadPath, "thumb_"+filename)
+
+	os.Remove(imagePath)
+	os.Remove(thumbPath)
+}
+
+// Helper to check if string is empty
+func isEmpty(s string) bool {
+	return strings.TrimSpace(s) == ""
 }
