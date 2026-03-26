@@ -82,12 +82,6 @@ func main() {
 	})
 
 	// Start server
-	fmt.Println("=================================")
-	fmt.Println("  GoIgniter - Full CRUD Example")
-	fmt.Println("=================================")
-	fmt.Println()
-	fmt.Println("Server running at http://localhost" + port)
-	fmt.Println()
 	fmt.Println("Default admin login:")
 	fmt.Println("  Email: admin@admin.com")
 	fmt.Println("  Password: password")
