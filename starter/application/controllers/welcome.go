@@ -10,6 +10,7 @@ type Welcome struct {
 // Index - GET /welcome
 func (w *Welcome) Index() {
 	w.Ctx.View("welcome", core.Map{
-		"Title": "Welcome to GoIgniter!",
+		"Title":   "Welcome to GoIgniter!",
+		"Version": core.Version,
 	})
 }

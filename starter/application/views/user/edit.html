@@ -1,0 +1,43 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>{{ .Title }}</title>
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.2/dist/css/bootstrap.min.css" rel="stylesheet">
+</head>
+<body>
+    <div class="container mt-5">
+        <h1>{{ .Title }}</h1>
+
+        <div class="card mt-4">
+            <div class="card-body">
+                <form method="POST" action="{{site_url "user/update/"}}{{.User.ID}}">
+                    <div class="mb-3">
+                        <label for="name" class="form-label">Name</label>
+                        <input type="text" class="form-control {{if .Errors.Name}}is-invalid{{end}}"
+                            id="name" name="name" value="{{.User.Name}}" required>
+                        {{if .Errors.Name}}
+                        <div class="invalid-feedback">{{.Errors.Name}}</div>
+                        {{end}}
+                    </div>
+
+                    <div class="mb-3">
+                        <label for="email" class="form-label">Email</label>
+                        <input type="email" class="form-control {{if .Errors.Email}}is-invalid{{end}}"
+                            id="email" name="email" value="{{.User.Email}}" required>
+                        {{if .Errors.Email}}
+                        <div class="invalid-feedback">{{.Errors.Email}}</div>
+                        {{end}}
+                    </div>
+
+                    <div class="d-flex gap-2">
+                        <a href="{{site_url "user/index"}}" class="btn btn-secondary">Cancel</a>
+                        <button type="submit" class="btn btn-primary">Update</button>
+                    </div>
+                </form>
+            </div>
+        </div>
+    </div>
+</body>
+</html>
