@@ -30,13 +30,19 @@ git clone https://github.com/semutdev/goigniter
 cd goigniter/starter
 ```
 
-### 2. Install Dependencies
+### 2. Copy exmple environment
+
+```bash
+cp .env.example .env
+```
+
+### 3. Install Dependencies
 
 ```bash
 go mod tidy
 ```
 
-### 3. Jalankan
+### 4. Jalankan
 
 ```bash
 go run main.go
