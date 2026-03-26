@@ -4,7 +4,7 @@ go 1.24.8
 
 require (
 	github.com/joho/godotenv v1.5.1
-	github.com/semutdev/goigniter v0.1.1
+	github.com/semutdev/goigniter v0.2.0
 )
 
 require (
@@ -21,5 +21,3 @@ require (
 	modernc.org/memory v1.8.0 // indirect
 	modernc.org/sqlite v1.34.5 // indirect
 )
-
-replace github.com/semutdev/goigniter => ../
