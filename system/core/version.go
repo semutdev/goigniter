@@ -3,7 +3,7 @@ package core
 // Version information - single source of truth
 const (
 	Version = "0.2.0"
-	Website = "https://goigniter.semutdev.my.id"
+	Website = "https://goigniter.semut.dev"
 	Github  = "https://github.com/semutdev/goigniter"
 )
 
