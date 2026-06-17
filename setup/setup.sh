@@ -24,11 +24,13 @@ DB_PASS=""
 DB_NAME=""
 FEATURES="login,admin"
 
+DB_TYPE_PROVIDED=false
+
 # Parse flags
 while [[ $# -gt 0 ]]; do
     case $1 in
         --name=*) APP_NAME="${1#*=}" ;;
-        --db=*) DB_TYPE="${1#*=}" ;;
+        --db=*) DB_TYPE="${1#*=}"; DB_TYPE_PROVIDED=true ;;
         --db-host=*) DB_HOST="${1#*=}" ;;
         --db-port=*) DB_PORT="${1#*=}" ;;
         --db-user=*) DB_USER="${1#*=}" ;;
@@ -56,8 +58,8 @@ if [ -z "$DB_NAME" ]; then
     DB_NAME="$APP_NAME"
 fi
 
-# Ask for db type if not mysql already set via flag
-if [ "$DB_TYPE" == "sqlite" ]; then
+# Ask for db type if not explicitly set via flag
+if [ "$DB_TYPE_PROVIDED" == "false" ]; then
     read -p "? Database type (sqlite/mysql) [sqlite]: " DB_INPUT
     if [ "$DB_INPUT" == "mysql" ]; then
         DB_TYPE="mysql"
@@ -108,17 +110,18 @@ echo "  Database: $DB_TYPE"
 echo "  Features: $FEATURES"
 echo ""
 
-# Get script directory
+# Get script directory and current working directory
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 TEMPLATES_DIR="$SCRIPT_DIR/templates"
+PROJECT_DIR="$PWD/$APP_NAME"
 
 # Create project directory
-if [ -d "$APP_NAME" ]; then
+if [ -d "$PROJECT_DIR" ]; then
     echo -e "${RED}Error: Directory '$APP_NAME' already exists${NC}"
     exit 1
 fi
 
-mkdir -p "$APP_NAME"
+mkdir -p "$PROJECT_DIR"
 
 # Source installer (will be created in next task)
 if [ -f "$SCRIPT_DIR/installer.sh" ]; then
