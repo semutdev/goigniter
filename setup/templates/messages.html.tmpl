@@ -1,0 +1,12 @@
+{{define "messages"}}
+{{if .Success}}
+<div class="alert alert-success">
+    {{.Success}}
+</div>
+{{end}}
+{{if .Error}}
+<div class="alert alert-error">
+    {{.Error}}
+</div>
+{{end}}
+{{end}}

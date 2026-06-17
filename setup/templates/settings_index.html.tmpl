@@ -1,0 +1,43 @@
+<!DOCTYPE html>
+<html lang="en">
+{{template "header" .}}
+<body class="admin-body">
+    <div class="admin-layout">
+        {{template "sidebar" .}}
+        
+        <main class="main-content">
+            {{if .Success}}
+            <div class="alert alert-success">
+                Settings saved successfully!
+            </div>
+            {{end}}
+            
+            <header class="page-header">
+                <h1>Settings</h1>
+            </header>
+
+            <div class="card">
+                <form action="/admin/settings/update" method="POST">
+                    
+                    <div class="form-group">
+                        <label for="site_name">Site Name</label>
+                        <input type="text" id="site_name" name="site_name" value="{{.SiteName}}">
+                    </div>
+
+                    <div class="form-group">
+                        <label for="site_tagline">Tagline</label>
+                        <input type="text" id="site_tagline" name="site_tagline" value="{{.SiteTagline}}">
+                    </div>
+
+                    <div class="form-group">
+                        <label for="site_logo">Logo URL</label>
+                        <input type="text" id="site_logo" name="site_logo" value="{{.SiteLogo}}" placeholder="https://example.com/logo.png">
+                    </div>
+
+                    <button type="submit" class="btn btn-primary">Save Settings</button>
+                </form>
+            </div>
+        </main>
+    </div>
+</body>
+</html>

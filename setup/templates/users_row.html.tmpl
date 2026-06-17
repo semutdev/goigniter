@@ -1,0 +1,21 @@
+<tr>
+    <td>{{.ID}}</td>
+    <td>{{.Email}}</td>
+    <td>{{.FullName}}</td>
+    <td>{{.Role}}</td>
+    <td>
+        {{if .IsActive}}
+        <span class="badge badge-success">Active</span>
+        {{else}}
+        <span class="badge badge-danger">Inactive</span>
+        {{end}}
+    </td>
+    <td>
+        <a href="/admin/users/edit/{{.ID}}" class="btn btn-sm btn-secondary" hx-boost="true">Edit</a>
+        <button hx-post="/admin/users/delete/{{.ID}}"
+                hx-confirm="Are you sure?"
+                hx-target="closest tr"
+                hx-swap="outerHTML swap:0.5s"
+                class="btn btn-sm btn-danger">Delete</button>
+    </td>
+</tr>

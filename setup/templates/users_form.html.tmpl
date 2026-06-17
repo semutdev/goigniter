@@ -1,0 +1,70 @@
+<!DOCTYPE html>
+<html lang="en">
+{{template "header" .}}
+<body class="admin-body">
+    <div class="admin-layout">
+        {{template "sidebar" .}}
+        
+        <main class="main-content">
+            {{if .Error}}
+            <div class="alert alert-error">
+                {{.Error}}
+            </div>
+            {{end}}
+            
+            <header class="page-header">
+                <h1>{{.Title}}</h1>
+                <a href="/admin/users/index" class="btn btn-secondary" hx-boost="true">Back</a>
+            </header>
+
+            <div class="card">
+                <form action="/admin/users/{{if .EditUser.ID}}update/{{.EditUser.ID}}{{else}}store{{end}}" 
+                      method="POST"
+                      hx-boost="true">
+                    
+                    <div class="form-group">
+                        <label for="email">Email</label>
+                        <input type="email" id="email" name="email" value="{{.EditUser.Email}}" required>
+                    </div>
+
+                    <div class="form-group">
+                        <label for="password">Password {{if .EditUser.ID}}(leave blank to keep current){{end}}</label>
+                        <input type="password" id="password" name="password" {{if not .EditUser.ID}}required{{end}}>
+                    </div>
+
+                    <div class="form-row">
+                        <div class="form-group">
+                            <label for="first_name">First Name</label>
+                            <input type="text" id="first_name" name="first_name" value="{{.EditUser.FirstName}}">
+                        </div>
+
+                        <div class="form-group">
+                            <label for="last_name">Last Name</label>
+                            <input type="text" id="last_name" name="last_name" value="{{.EditUser.LastName}}">
+                        </div>
+                    </div>
+
+                    <div class="form-group">
+                        <label for="role">Role</label>
+                        <select id="role" name="role">
+                            <option value="user" {{if eq .EditUser.Role "user"}}selected{{end}}>User</option>
+                            <option value="admin" {{if eq .EditUser.Role "admin"}}selected{{end}}>Admin</option>
+                        </select>
+                    </div>
+
+                    {{if .EditUser.ID}}
+                    <div class="form-group">
+                        <label class="checkbox">
+                            <input type="checkbox" name="is_active" {{if .EditUser.IsActive}}checked{{end}}>
+                            Active
+                        </label>
+                    </div>
+                    {{end}}
+
+                    <button type="submit" class="btn btn-primary">Save User</button>
+                </form>
+            </div>
+        </main>
+    </div>
+</body>
+</html>

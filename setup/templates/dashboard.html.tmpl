@@ -1,0 +1,35 @@
+<!DOCTYPE html>
+<html lang="en">
+{{template "header" .}}
+<body class="admin-body">
+    <div class="admin-layout">
+        {{template "sidebar" .}}
+        
+        <main class="main-content">
+            {{if .Success}}
+            <div class="alert alert-success">
+                Settings saved successfully!
+            </div>
+            {{end}}
+            
+            {{if .Error}}
+            <div class="alert alert-error">
+                {{.Error}}
+            </div>
+            {{end}}
+            
+            <header class="page-header">
+                <h1>Dashboard</h1>
+                <p>Welcome back, {{.User.FullName}}!</p>
+            </header>
+
+            <div class="stats-grid">
+                <div class="stat-card">
+                    <div class="stat-value">{{.UserCount}}</div>
+                    <div class="stat-label">Total Users</div>
+                </div>
+            </div>
+        </main>
+    </div>
+</body>
+</html>

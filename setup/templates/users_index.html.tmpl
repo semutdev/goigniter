@@ -1,0 +1,74 @@
+<!DOCTYPE html>
+<html lang="en">
+{{template "header" .}}
+<body class="admin-body">
+    <div class="admin-layout">
+        {{template "sidebar" .}}
+        
+        <main class="main-content">
+            {{if .Error}}
+            <div class="alert alert-error">
+                {{.Error}}
+            </div>
+            {{end}}
+            
+            <header class="page-header">
+                <h1>Users</h1>
+                <a href="/admin/users/create" class="btn btn-primary" hx-boost="true">Add User</a>
+            </header>
+
+            <table class="table">
+                <thead>
+                    <tr>
+                        <th>ID</th>
+                        <th>Email</th>
+                        <th>Name</th>
+                        <th>Role</th>
+                        <th>Status</th>
+                        <th>Actions</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    {{range .Users}}
+                    <tr>
+                        <td>{{.ID}}</td>
+                        <td>{{.Email}}</td>
+                        <td>{{.FullName}}</td>
+                        <td>{{.Role}}</td>
+                        <td>
+                            {{if .IsActive}}
+                            <span class="badge badge-success">Active</span>
+                            {{else}}
+                            <span class="badge badge-danger">Inactive</span>
+                            {{end}}
+                        </td>
+                        <td>
+                            <a href="/admin/users/edit/{{.ID}}" class="btn btn-sm btn-secondary" hx-boost="true">Edit</a>
+                            <button hx-post="/admin/users/delete/{{.ID}}"
+                                    hx-confirm="Are you sure you want to delete this user?"
+                                    hx-target="closest tr"
+                                    hx-swap="outerHTML swap:0.5s"
+                                    class="btn btn-sm btn-danger">Delete</button>
+                        </td>
+                    </tr>
+                    {{end}}
+                </tbody>
+            </table>
+
+            {{if .HasPages}}
+            <div class="pagination">
+                {{if gt .Page 1}}
+                <a href="?page={{.Page | minus 1}}" class="btn btn-secondary">Previous</a>
+                {{end}}
+                
+                <span class="page-info">Page {{.Page}}</span>
+                
+                {{if lt (mul .Page .PerPage) .Total}}
+                <a href="?page={{.Page | plus 1}}" class="btn btn-secondary">Next</a>
+                {{end}}
+            </div>
+            {{end}}
+        </main>
+    </div>
+</body>
+</html>

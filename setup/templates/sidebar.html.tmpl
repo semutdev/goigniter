@@ -1,0 +1,19 @@
+<aside class="sidebar">
+    <div class="sidebar-header">
+        <h2>{{.AppName}}</h2>
+    </div>
+    <nav class="sidebar-nav">
+        <a href="/admin/dashboard/index" class="nav-link {{if eq .Title "Dashboard"}}active{{end}}">
+            Dashboard
+        </a>
+        <a href="/admin/users/index" class="nav-link {{if eq .Title "Users"}}active{{end}}">
+            Users
+        </a>
+        <a href="/admin/settings/index" class="nav-link {{if eq .Title "Settings"}}active{{end}}">
+            Settings
+        </a>
+    </nav>
+    <div class="sidebar-footer">
+        <a href="/auth/logout" class="nav-link">Logout</a>
+    </div>
+</aside>

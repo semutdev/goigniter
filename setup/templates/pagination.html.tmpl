@@ -1,0 +1,13 @@
+{{define "pagination"}}
+<div class="pagination">
+    {{if gt .Page 1}}
+    <a href="?page={{.Page | minus 1}}" class="btn btn-secondary">Previous</a>
+    {{end}}
+    
+    <span class="page-info">Page {{.Page}}</span>
+    
+    {{if lt (mul .Page .PerPage) .Total}}
+    <a href="?page={{.Page | plus 1}}" class="btn btn-secondary">Next</a>
+    {{end}}
+</div>
+{{end}}
