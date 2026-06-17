@@ -1,0 +1,120 @@
+package libs
+
+import (
+	"{{.ModulePath}}/application/config"
+	"{{.ModulePath}}/application/models"
+
+	"github.com/semutdev/goigniter/system/core"
+	"github.com/semutdev/goigniter/system/libraries/session"
+)
+
+const (
+	SessionKeyUserID    = "user_id"
+	SessionKeyUserEmail = "user_email"
+	SessionKeyUserRole  = "user_role"
+)
+
+// Login authenticates a user and returns the user if successful
+func Login(email, password string) (*models.User, error) {
+	var user models.User
+	result := config.DB.Where("email = ?", email).First(&user)
+	if result.Error != nil {
+		return nil, ErrInvalidCredentials
+	}
+
+	if !user.IsActive {
+		return nil, ErrUserInactive
+	}
+
+	if !user.CheckPassword(password) {
+		return nil, ErrInvalidCredentials
+	}
+
+	return &user, nil
+}
+
+// SetSession stores user info in session
+func SetSession(c *core.Context, user *models.User) {
+	sess := session.Get(c)
+	sess.Set(SessionKeyUserID, user.ID)
+	sess.Set(SessionKeyUserEmail, user.Email)
+	sess.Set(SessionKeyUserRole, user.Role)
+	sess.Save()
+}
+
+// ClearSession removes user info from session
+func ClearSession(c *core.Context) {
+	sess := session.Get(c)
+	sess.Delete(SessionKeyUserID)
+	sess.Delete(SessionKeyUserEmail)
+	sess.Delete(SessionKeyUserRole)
+	sess.Save()
+}
+
+// IsLoggedIn checks if user is logged in
+func IsLoggedIn(c *core.Context) bool {
+	sess := session.Get(c)
+	userID := sess.Get(SessionKeyUserID)
+	return userID != nil
+}
+
+// GetCurrentUser returns the current logged in user
+func GetCurrentUser(c *core.Context) *models.User {
+	sess := session.Get(c)
+	userID := sess.Get(SessionKeyUserID)
+	if userID == nil {
+		return nil
+	}
+
+	var user models.User
+	result := config.DB.First(&user, userID)
+	if result.Error != nil {
+		return nil
+	}
+	return &user
+}
+
+// IsAdmin checks if current user is admin
+func IsAdmin(c *core.Context) bool {
+	sess := session.Get(c)
+	role, ok := sess.Get(SessionKeyUserRole).(string)
+	if !ok {
+		return false
+	}
+	return role == "admin"
+}
+
+// CreateUser creates a new user
+func CreateUser(email, password, firstName, lastName, role string) (*models.User, error) {
+	user := &models.User{
+		Email:     email,
+		FirstName: firstName,
+		LastName:  lastName,
+		Role:      role,
+		IsActive:  true,
+	}
+	
+	if err := user.SetPassword(password); err != nil {
+		return nil, err
+	}
+
+	if err := config.DB.Create(user).Error; err != nil {
+		return nil, err
+	}
+
+	return user, nil
+}
+
+// Error types
+var (
+	ErrUserInactive      = &AuthError{Message: "User account is inactive"}
+	ErrInvalidCredentials = &AuthError{Message: "Invalid email or password"}
+)
+
+type AuthError struct {
+	Message string
+}
+
+func (e *AuthError) Error() string {
+	return e.Message
+}
