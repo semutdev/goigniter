@@ -1,0 +1,39 @@
+package config
+
+import (
+	"fmt"
+	"os"
+
+	"github.com/joho/godotenv"
+	"{{.ModulePath}}/application/models"
+	"gorm.io/driver/mysql"
+	"gorm.io/driver/sqlite"
+	"gorm.io/gorm"
+)
+
+var DB *gorm.DB
+
+func ConnectDB() {
+	godotenv.Load()
+
+	driver := os.Getenv("DB_DRIVER")
+	dsn := os.Getenv("DB_DSN")
+
+	var err error
+	var dialector gorm.Dialector
+
+	switch driver {
+	case "mysql":
+		dialector = mysql.Open(dsn)
+	default:
+		dialector = sqlite.Open(dsn)
+	}
+
+	DB, err = gorm.Open(dialector, &gorm.Config{})
+	if err != nil {
+		panic(fmt.Sprintf("Failed to connect to database: %v", err))
+	}
+
+	// Auto migrate
+	DB.AutoMigrate(&models.User{}, &models.Setting{})
+}

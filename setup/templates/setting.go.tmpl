@@ -1,0 +1,41 @@
+package models
+
+import (
+	"time"
+
+	"{{.ModulePath}}/application/config"
+	"gorm.io/gorm"
+)
+
+type Setting struct {
+	ID        uint           `gorm:"primaryKey" json:"id"`
+	Key       string         `gorm:"uniqueIndex;size:100;not null" json:"key"`
+	Value     string         `gorm:"type:text" json:"value"`
+	CreatedAt time.Time      `json:"created_at"`
+	UpdatedAt time.Time      `json:"updated_at"`
+	DeletedAt gorm.DeletedAt `gorm:"index" json:"-"`
+}
+
+// GetSetting retrieves a setting by key
+func GetSetting(key string) string {
+	var setting Setting
+	result := config.DB.Where("key = ?", key).First(&setting)
+	if result.Error != nil {
+		return ""
+	}
+	return setting.Value
+}
+
+// SetSetting sets a setting value
+func SetSetting(key, value string) error {
+	var setting Setting
+	result := config.DB.Where("key = ?", key).First(&setting)
+	if result.Error != nil {
+		// Create new
+		setting = Setting{Key: key, Value: value}
+		return config.DB.Create(&setting).Error
+	}
+	// Update existing
+	setting.Value = value
+	return config.DB.Save(&setting).Error
+}
