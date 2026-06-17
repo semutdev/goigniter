@@ -1,0 +1,96 @@
+package main
+
+import (
+	"log"
+	"os"
+
+	"{{.ModulePath}}/application/config"
+	_ "{{.ModulePath}}/application/controllers"
+	_ "{{.ModulePath}}/application/controllers/admin"
+	"{{.ModulePath}}/application/libs"
+	"{{.ModulePath}}/database"
+
+	"github.com/joho/godotenv"
+	"github.com/semutdev/goigniter/system/core"
+	"github.com/semutdev/goigniter/system/helpers"
+	"github.com/semutdev/goigniter/system/libraries/session"
+	"github.com/semutdev/goigniter/system/middleware"
+)
+
+func main() {
+	// Load .env file
+	godotenv.Load()
+
+	// Connect to database
+	config.ConnectDB()
+
+	// Run seeder if DB_SEED=true
+	if os.Getenv("DB_SEED") == "true" {
+		database.Seed(config.DB)
+	}
+
+	// Create application
+	app := core.New()
+
+	// Initialize helpers
+	port := os.Getenv("APP_PORT")
+	if port == "" {
+		port = ":8080"
+	}
+	helpers.Init("http://localhost" + port)
+
+	// Initialize session
+	sessionSecret := os.Getenv("APP_KEY")
+	if sessionSecret == "" {
+		sessionSecret = "{{.AppKey}}"
+	}
+	session.Init(session.Config{
+		Secret: sessionSecret,
+		MaxAge: 86400,
+	})
+
+	// Load templates
+	if err := app.LoadTemplatesWithFuncs("./application/views", true, helpers.AllTemplateFuncs()); err != nil {
+		log.Printf("Warning: Could not load templates: %v", err)
+	}
+
+	// Global middleware
+	app.Use(middleware.Logger())
+	app.Use(middleware.Recovery())
+
+	// Static files
+	app.Static("/static/", "./public")
+
+	// Auth middleware for admin routes
+	app.Use(func(next core.HandlerFunc) core.HandlerFunc {
+		return func(c *core.Context) error {
+			// Skip auth for login and static routes
+			path := c.Request.URL.Path
+			if path == "/auth/login" || path == "/auth/dologin" || 
+			   len(path) >= 7 && path[:7] == "/static" {
+				return next(c)
+			}
+			
+			// Require auth for admin routes
+			if len(path) >= 6 && path[:6] == "/admin" {
+				if !libs.IsLoggedIn(c) {
+					return c.Redirect(302, "/auth/login")
+				}
+			}
+			return next(c)
+		}
+	})
+
+	// Auto-route from registered controllers
+	app.AutoRoute()
+
+	// Root redirect
+	app.GET("/", func(c *core.Context) error {
+		return c.Redirect(302, "/admin/dashboard")
+	})
+
+	// Start server
+	log.Println("Server starting on " + port)
+	log.Println("Default login: admin@admin.com / password")
+	log.Fatal(app.Run(port))
+}

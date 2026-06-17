@@ -1,0 +1,17 @@
+module {{.ModulePath}}
+
+go 1.24
+
+require (
+	github.com/go-sql-driver/mysql v1.9.3
+	github.com/joho/godotenv v1.5.1
+	github.com/semutdev/goigniter v0.0.0
+	golang.org/x/crypto v0.32.0
+	gorm.io/driver/mysql v1.5.7
+	gorm.io/driver/sqlite v1.5.7
+	gorm.io/gorm v1.25.12
+	modernc.org/sqlite v1.34.5
+)
+
+// Replace with local goigniter for development
+// replace github.com/semutdev/goigniter => ../
