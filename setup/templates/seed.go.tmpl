@@ -1,0 +1,46 @@
+package database
+
+import (
+	"{{.ModulePath}}/application/models"
+
+	"gorm.io/gorm"
+)
+
+func Seed(db *gorm.DB) error {
+	// Auto migrate
+	if err := db.AutoMigrate(&models.User{}, &models.Setting{}); err != nil {
+		return err
+	}
+
+	// Create admin user if not exists
+	var count int64
+	db.Model(&models.User{}).Where("role = ?", "admin").Count(&count)
+	if count == 0 {
+		admin := &models.User{
+			Email:     "admin@admin.com",
+			FirstName: "Admin",
+			LastName:  "User",
+			Role:      "admin",
+			IsActive:  true,
+		}
+		admin.SetPassword("password")
+		db.Create(admin)
+	}
+
+	// Create default settings
+	settings := map[string]string{
+		"site_name":    "{{.AppName}}",
+		"site_tagline": "Built with GoIgniter",
+		"site_logo":    "",
+	}
+
+	for key, value := range settings {
+		var setting models.Setting
+		result := db.Where("key = ?", key).First(&setting)
+		if result.Error != nil {
+			db.Create(&models.Setting{Key: key, Value: value})
+		}
+	}
+
+	return nil
+}

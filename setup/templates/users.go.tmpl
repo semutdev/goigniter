@@ -1,0 +1,131 @@
+package admin
+
+import (
+	"net/http"
+	"strconv"
+
+	"{{.ModulePath}}/application/config"
+	"{{.ModulePath}}/application/libs"
+	"{{.ModulePath}}/application/models"
+
+	"github.com/semutdev/goigniter/system/core"
+)
+
+func init() {
+	core.Register(&Users{})
+}
+
+type Users struct {
+	core.Controller
+}
+
+// Index displays user list
+func (u *Users) Index() {
+	page, _ := strconv.Atoi(u.Ctx.Query("page"))
+	if page < 1 {
+		page = 1
+	}
+	perPage := 10
+
+	var users []models.User
+	var total int64
+	config.DB.Model(&models.User{}).Count(&total)
+	config.DB.Offset((page - 1) * perPage).Limit(perPage).Find(&users)
+
+	user := libs.GetCurrentUser(u.Ctx)
+
+	u.Ctx.View("admin/users/index", core.Map{
+		"Title":    "Users",
+		"AppName":  "{{.AppName}}",
+		"Users":    users,
+		"User":     user,
+		"Page":     page,
+		"Total":    total,
+		"PerPage":  perPage,
+		"HasPages": total > int64(perPage),
+	})
+}
+
+// Create displays create user form
+func (u *Users) Create() {
+	user := libs.GetCurrentUser(u.Ctx)
+	u.Ctx.View("admin/users/_form", core.Map{
+		"Title":     "Create User",
+		"AppName":   "{{.AppName}}",
+		"User":      user,
+		"EditUser":  &models.User{},
+	})
+}
+
+// Store saves new user
+func (u *Users) Store() {
+	email := u.Ctx.FormValue("email")
+	password := u.Ctx.FormValue("password")
+	firstName := u.Ctx.FormValue("first_name")
+	lastName := u.Ctx.FormValue("last_name")
+	role := u.Ctx.FormValue("role")
+
+	_, err := libs.CreateUser(email, password, firstName, lastName, role)
+	if err != nil {
+		user := libs.GetCurrentUser(u.Ctx)
+		u.Ctx.View("admin/users/_form", core.Map{
+			"Title":     "Create User",
+			"AppName":   "{{.AppName}}",
+			"User":      user,
+			"EditUser":  &models.User{Email: email, FirstName: firstName, LastName: lastName, Role: role},
+			"Error":     "Failed to create user: " + err.Error(),
+		})
+		return
+	}
+
+	u.Ctx.Redirect(http.StatusFound, "/admin/users/index")
+}
+
+// Edit displays edit user form
+func (u *Users) Edit() {
+	id := u.Ctx.Param("id")
+	var editUser models.User
+	if err := config.DB.First(&editUser, id).Error; err != nil {
+		u.Ctx.Redirect(http.StatusFound, "/admin/users/index")
+		return
+	}
+
+	user := libs.GetCurrentUser(u.Ctx)
+	u.Ctx.View("admin/users/_form", core.Map{
+		"Title":     "Edit User",
+		"AppName":   "{{.AppName}}",
+		"User":      user,
+		"EditUser":  &editUser,
+	})
+}
+
+// Update saves user changes
+func (u *Users) Update() {
+	id := u.Ctx.Param("id")
+	var editUser models.User
+	if err := config.DB.First(&editUser, id).Error; err != nil {
+		u.Ctx.Redirect(http.StatusFound, "/admin/users/index")
+		return
+	}
+
+	editUser.Email = u.Ctx.FormValue("email")
+	editUser.FirstName = u.Ctx.FormValue("first_name")
+	editUser.LastName = u.Ctx.FormValue("last_name")
+	editUser.Role = u.Ctx.FormValue("role")
+	editUser.IsActive = u.Ctx.FormValue("is_active") == "on"
+
+	password := u.Ctx.FormValue("password")
+	if password != "" {
+		editUser.SetPassword(password)
+	}
+
+	config.DB.Save(&editUser)
+	u.Ctx.Redirect(http.StatusFound, "/admin/users/index")
+}
+
+// Delete removes a user
+func (u *Users) Delete() {
+	id := u.Ctx.Param("id")
+	config.DB.Delete(&models.User{}, id)
+	u.Ctx.Redirect(http.StatusFound, "/admin/users/index")
+}

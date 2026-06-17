@@ -1,0 +1,40 @@
+package admin
+
+import (
+	"{{.ModulePath}}/application/libs"
+	"{{.ModulePath}}/application/models"
+
+	"github.com/semutdev/goigniter/system/core"
+)
+
+func init() {
+	core.Register(&Settings{})
+}
+
+type Settings struct {
+	core.Controller
+}
+
+// Index displays settings form
+func (s *Settings) Index() {
+	user := libs.GetCurrentUser(s.Ctx)
+
+	s.Ctx.View("admin/settings/index", core.Map{
+		"Title":        "Settings",
+		"AppName":      "{{.AppName}}",
+		"User":         user,
+		"SiteName":     models.GetSetting("site_name"),
+		"SiteTagline":  models.GetSetting("site_tagline"),
+		"SiteLogo":     models.GetSetting("site_logo"),
+		"Success":      s.Ctx.Query("success"),
+	})
+}
+
+// Update saves settings
+func (s *Settings) Update() {
+	models.SetSetting("site_name", s.Ctx.FormValue("site_name"))
+	models.SetSetting("site_tagline", s.Ctx.FormValue("site_tagline"))
+	models.SetSetting("site_logo", s.Ctx.FormValue("site_logo"))
+
+	s.Ctx.Redirect(302, "/admin/settings/index?success=1")
+}

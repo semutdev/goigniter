@@ -1,0 +1,65 @@
+package controllers
+
+import (
+	"net/http"
+
+	"{{.ModulePath}}/application/libs"
+
+	"github.com/semutdev/goigniter/system/core"
+)
+
+func init() {
+	core.Register(&Auth{})
+}
+
+type Auth struct {
+	core.Controller
+}
+
+// Login displays the login form
+func (a *Auth) Login() {
+	if libs.IsLoggedIn(a.Ctx) {
+		a.Ctx.Redirect(http.StatusFound, "/admin/dashboard")
+		return
+	}
+
+	a.Ctx.View("auth/login", core.Map{
+		"Title":    "Login",
+		"AppName":  "{{.AppName}}",
+		"Error":    a.Ctx.Query("error"),
+	})
+}
+
+// Dologin processes the login
+func (a *Auth) Dologin() {
+	email := a.Ctx.FormValue("email")
+	password := a.Ctx.FormValue("password")
+
+	if email == "" || password == "" {
+		a.Ctx.View("auth/login", core.Map{
+			"Title":    "Login",
+			"AppName":  "{{.AppName}}",
+			"Error":    "Email and password are required",
+		})
+		return
+	}
+
+	user, err := libs.Login(email, password)
+	if err != nil {
+		a.Ctx.View("auth/login", core.Map{
+			"Title":    "Login",
+			"AppName":  "{{.AppName}}",
+			"Error":    "Invalid email or password",
+		})
+		return
+	}
+
+	libs.SetSession(a.Ctx, user)
+	a.Ctx.Redirect(http.StatusFound, "/admin/dashboard")
+}
+
+// Logout clears the session
+func (a *Auth) Logout() {
+	libs.ClearSession(a.Ctx)
+	a.Ctx.Redirect(http.StatusFound, "/auth/login")
+}

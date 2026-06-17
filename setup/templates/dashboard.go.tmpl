@@ -1,0 +1,33 @@
+package admin
+
+import (
+	"{{.ModulePath}}/application/config"
+	"{{.ModulePath}}/application/libs"
+	"{{.ModulePath}}/application/models"
+
+	"github.com/semutdev/goigniter/system/core"
+)
+
+func init() {
+	core.Register(&Dashboard{})
+}
+
+type Dashboard struct {
+	core.Controller
+}
+
+// Index displays the admin dashboard
+func (d *Dashboard) Index() {
+	user := libs.GetCurrentUser(d.Ctx)
+	
+	// Get stats
+	var userCount int64
+	config.DB.Model(&models.User{}).Count(&userCount)
+
+	d.Ctx.View("admin/dashboard", core.Map{
+		"Title":     "Dashboard",
+		"AppName":   "{{.AppName}}",
+		"User":      user,
+		"UserCount": userCount,
+	})
+}
