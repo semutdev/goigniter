@@ -8,6 +8,9 @@ YELLOW='\033[1;33m'
 BLUE='\033[0;34m'
 NC='\033[0m' # No Color
 
+# GitHub repo URL
+REPO_URL="https://raw.githubusercontent.com/semutdev/goigniter/main"
+
 # Banner
 echo -e "${BLUE}"
 echo "🚀 GoIgniter Setup Wizard"
@@ -110,9 +113,7 @@ echo "  Database: $DB_TYPE"
 echo "  Features: $FEATURES"
 echo ""
 
-# Get script directory and current working directory
-SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
-TEMPLATES_DIR="$SCRIPT_DIR/templates"
+# Project directory
 PROJECT_DIR="$PWD/$APP_NAME"
 
 # Create project directory
@@ -123,11 +124,64 @@ fi
 
 mkdir -p "$PROJECT_DIR"
 
-# Source installer (will be created in next task)
-if [ -f "$SCRIPT_DIR/installer.sh" ]; then
+# Check if running locally or via curl
+SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)" 2>/dev/null || SCRIPT_DIR=""
+TEMPLATES_DIR="$SCRIPT_DIR/templates"
+
+if [ -f "$SCRIPT_DIR/installer.sh" ] && [ -d "$TEMPLATES_DIR" ]; then
+    # Running locally - source installer directly
     source "$SCRIPT_DIR/installer.sh"
 else
-    echo -e "${YELLOW}Note: installer.sh not found. Creating basic structure only.${NC}"
+    # Running via curl - download files from GitHub
+    echo -e "${YELLOW}Downloading templates from GitHub...${NC}"
+    
+    # Create temp directory for templates
+    TEMP_DIR=$(mktemp -d)
+    TEMPLATES_DIR="$TEMP_DIR/templates"
+    mkdir -p "$TEMPLATES_DIR"
+    
+    # Download installer.sh
+    curl -sSL "$REPO_URL/setup/installer.sh" -o "$TEMP_DIR/installer.sh"
+    
+    # Download all templates
+    TEMPLATE_FILES=(
+        "gomod.tmpl"
+        "env.tmpl"
+        "env.example.tmpl"
+        "main.go.tmpl"
+        "database.go.tmpl"
+        "user.go.tmpl"
+        "setting.go.tmpl"
+        "auth.go.tmpl"
+        "auth_lib.go.tmpl"
+        "dashboard.go.tmpl"
+        "users.go.tmpl"
+        "settings.go.tmpl"
+        "seed.go.tmpl"
+        "main.html.tmpl"
+        "login.html.tmpl"
+        "dashboard.html.tmpl"
+        "users_index.html.tmpl"
+        "users_form.html.tmpl"
+        "users_row.html.tmpl"
+        "settings_index.html.tmpl"
+        "header.html.tmpl"
+        "sidebar.html.tmpl"
+        "footer.html.tmpl"
+        "messages.html.tmpl"
+        "pagination.html.tmpl"
+        "style.css.tmpl"
+    )
+    
+    for tmpl in "${TEMPLATE_FILES[@]}"; do
+        curl -sSL "$REPO_URL/setup/templates/$tmpl" -o "$TEMPLATES_DIR/$tmpl"
+    done
+    
+    # Source installer
+    source "$TEMP_DIR/installer.sh"
+    
+    # Cleanup temp directory
+    rm -rf "$TEMP_DIR"
 fi
 
 echo ""
