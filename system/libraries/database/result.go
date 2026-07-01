@@ -179,6 +179,7 @@ func scanRowsToMap(rows *sql.Rows) ([]map[string]any, error) {
 }
 
 // makeScanDest creates scan destinations for a struct.
+// Supports embedded structs via FieldByIndex.
 func makeScanDest(elem reflect.Value, columns []string) []any {
 	scanDest := make([]any, len(columns))
 	fieldMap := makeFieldMap(elem.Type())
@@ -186,7 +187,8 @@ func makeScanDest(elem reflect.Value, columns []string) []any {
 	for i, col := range columns {
 		colLower := strings.ToLower(col)
 		if fieldIdx, ok := fieldMap[colLower]; ok {
-			scanDest[i] = elem.Field(fieldIdx).Addr().Interface()
+			// Use FieldByIndex to handle embedded structs
+			scanDest[i] = elem.FieldByIndex(fieldIdx).Addr().Interface()
 		} else {
 			// Column doesn't match any field, use a dummy variable
 			var dummy any
@@ -198,34 +200,53 @@ func makeScanDest(elem reflect.Value, columns []string) []any {
 }
 
 // makeFieldMap creates a map of lowercase column names to field indices.
-func makeFieldMap(t reflect.Type) map[string]int {
-	fieldMap := make(map[string]int)
+// Supports embedded (anonymous) structs by walking into them.
+func makeFieldMap(t reflect.Type) map[string][]int {
+	fieldMap := make(map[string][]int)
+	makeFieldMapRecursive(t, nil, fieldMap)
+	return fieldMap
+}
 
+// makeFieldMapRecursive recursively builds the field map, handling embedded structs.
+func makeFieldMapRecursive(t reflect.Type, indexPrefix []int, fieldMap map[string][]int) {
 	for i := 0; i < t.NumField(); i++ {
 		field := t.Field(i)
+		fullIndex := append([]int{}, indexPrefix...)
+		fullIndex = append(fullIndex, i)
+
+		// Handle embedded (anonymous) structs - recurse into them
+		if field.Anonymous && field.Type.Kind() == reflect.Struct {
+			makeFieldMapRecursive(field.Type, fullIndex, fieldMap)
+			continue
+		}
+
+		// Skip unexported fields
+		if field.PkgPath != "" {
+			continue
+		}
+
+		var colName string
 
 		// Check for db tag
 		if tag := field.Tag.Get("db"); tag != "" {
-			if tag != "-" {
-				fieldMap[strings.ToLower(tag)] = i
+			if tag == "-" {
+				continue
 			}
-			continue
-		}
-
-		// Check for json tag
-		if tag := field.Tag.Get("json"); tag != "" {
+			colName = tag
+		} else if tag := field.Tag.Get("json"); tag != "" {
+			// Check for json tag
 			tagName := strings.Split(tag, ",")[0]
-			if tagName != "-" {
-				fieldMap[strings.ToLower(tagName)] = i
+			if tagName == "-" {
+				continue
 			}
-			continue
+			colName = tagName
+		} else {
+			// Use field name converted to snake_case
+			colName = toSnakeCase(field.Name)
 		}
 
-		// Use field name
-		fieldMap[strings.ToLower(field.Name)] = i
+		fieldMap[strings.ToLower(colName)] = fullIndex
 	}
-
-	return fieldMap
 }
 
 // InsertStruct inserts a struct into the table.

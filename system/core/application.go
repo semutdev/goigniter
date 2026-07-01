@@ -107,6 +107,27 @@ func (g *Group) DELETE(pattern string, handler HandlerFunc) {
 	g.app.router.Add(http.MethodDelete, fullPath, wrapped)
 }
 
+// PATCH registers a PATCH route in the group.
+func (g *Group) PATCH(pattern string, handler HandlerFunc) {
+	fullPath := path.Join(g.prefix, pattern)
+	wrapped := g.wrapHandler(handler)
+	g.app.router.Add(http.MethodPatch, fullPath, wrapped)
+}
+
+// OPTIONS registers an OPTIONS route in the group.
+func (g *Group) OPTIONS(pattern string, handler HandlerFunc) {
+	fullPath := path.Join(g.prefix, pattern)
+	wrapped := g.wrapHandler(handler)
+	g.app.router.Add(http.MethodOptions, fullPath, wrapped)
+}
+
+// HEAD registers a HEAD route in the group.
+func (g *Group) HEAD(pattern string, handler HandlerFunc) {
+	fullPath := path.Join(g.prefix, pattern)
+	wrapped := g.wrapHandler(handler)
+	g.app.router.Add(http.MethodHead, fullPath, wrapped)
+}
+
 // Group creates a nested group.
 func (g *Group) Group(prefix string, middlewares ...Middleware) *Group {
 	return &Group{
