@@ -968,6 +968,10 @@ imgProcessor := upload.NewImageProcessor(upload.ImageConfig{
     Height:              600,
     MaintainAspectRatio: true,
     Quality:             85,
+    // Note: Thumbnails are generated during Resize() via config:
+    // CreateThumbnail: true,
+    // ThumbnailWidth:  150,
+    // ThumbnailHeight: 150,
 })
 
 if err := imgProcessor.Resize(); err != nil {
@@ -975,8 +979,9 @@ if err := imgProcessor.Resize(); err != nil {
 }
 
 // Additional operations supported:
-// imgProcessor.Crop(width, height, x, y)
-// imgProcessor.Thumbnail(150, 150)
+// imgProcessor.Crop(x, y, width, height)
+// imgProcessor.Fit()
+// imgProcessor.Fill()
 // imgProcessor.Rotate(90)
 ```
 
@@ -1049,20 +1054,51 @@ app.Use(middleware.CSRFWithConfig(middleware.CSRFConfig{
 }))
 ```
 
+In Controllers (populating template data or rendering helpers):
+```go
+// Populate raw token for manual rendering:
+c.View("users/create", core.Map{
+    "csrf_token": middleware.CSRFToken(c),
+})
+
+// Or pass pre-rendered form field / meta tag helpers:
+c.View("users/create", core.Map{
+    "csrf_field": template.HTML(middleware.CSRFFormField(c)),
+    "csrf_meta":  template.HTML(middleware.CSRFMetaTag(c)),
+})
+```
+
 In HTML templates:
 ```html
 <!-- CI3 -->
 <input type="hidden" name="<?= $this->security->get_csrf_token_name(); ?>" value="<?= $this->security->get_csrf_hash(); ?>">
 
-<!-- GoIgniter -->
+<!-- GoIgniter: Manual hidden input with token from context -->
 <input type="hidden" name="csrf_token" value="{{ .csrf_token }}">
+
+<!-- GoIgniter: Or render helper field passed from controller (middleware.CSRFFormField(c)) -->
+{{ .csrf_field }}
 ```
 
 For AJAX / Fetch requests:
+```html
+<!-- Meta tag in layout header (or via middleware.CSRFMetaTag(c)): -->
+<meta name="csrf-token" content="{{ .csrf_token }}">
+```
+
 ```javascript
 // Header sent with AJAX:
 // Header Name: X-CSRF-Token
-// Value: Read from "csrf_token" cookie
+// Value: Read from meta tag content or document.cookie ("csrf_token")
+const token = document.querySelector('meta[name="csrf-token"]')?.getAttribute('content');
+fetch('/api/submit', {
+    method: 'POST',
+    headers: {
+        'X-CSRF-Token': token,
+        'Content-Type': 'application/json'
+    },
+    body: JSON.stringify(data)
+});
 ```
 
 ### 10.3 Authentication Middleware
@@ -1089,8 +1125,8 @@ apiGroup := app.Group("/api", middleware.BearerAuth(func(token string) bool {
 | `site_url($path)` | `helpers.SiteURL(path)` | Alias to `BaseURL` |
 | `base_url('public/'.$path)` | `helpers.AssetURL(path)` | Prefixes `/public/` |
 | `current_url()` | `c.Request.URL.String()` | Context request URL |
-| `var_dump($var)` | `helpers.Dump(var)` | Pretty printer |
-| `json_encode($data)` | `helpers.DumpJSON(data)` | Formatted JSON dumper |
+| `var_dump($var)` | `helpers.PrintDebug(var)` | Pretty printer for structs/maps/slices (`"github.com/semutdev/goigniter/system/helpers"`) |
+| `json_encode($data)` | `json.Marshal(data)` or `c.JSON(200, data)` | `"encoding/json"` or Context JSON response |
 | `redirect($url)` | `c.Redirect(http.StatusFound, url)` | HTTP 302 redirect |
 | `show_404()` | `c.HTML(404, "Page Not Found")` | 404 response |
 | `show_error($msg, 500)` | `c.String(500, msg)` | 500 response |
@@ -1141,7 +1177,7 @@ apiGroup := app.Group("/api", middleware.BearerAuth(func(token string) bool {
 | **Transaction** | `$this->db->trans_start(); ...` | `db.Transaction(func(tx) error { ... })`| Automatic rollback on error |
 | **Upload Init** | `$this->load->library('upload', $cfg)` | `uploader := upload.New(cfg)` | Struct config |
 | **Upload Do** | `$this->upload->do_upload('file')` | `result, err := uploader.Do("file", c.Request)` | Returns typed `*Result` |
-| **CSRF Token** | `$this->security->get_csrf_hash()` | `{{ .csrf_token }}` / Header `X-CSRF-Token`| Constant-time token check |
+| **CSRF Token** | `$this->security->get_csrf_hash()` | `{{ .csrf_token }}` / `middleware.CSRFToken(c)` | Header `X-CSRF-Token`; helpers: `CSRFFormField(c)`, `CSRFMetaTag(c)` |
 
 ---
 
