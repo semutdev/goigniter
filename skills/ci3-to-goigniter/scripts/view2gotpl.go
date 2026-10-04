@@ -12,15 +12,16 @@ import (
 )
 
 var (
-	reVarExpr  = regexp.MustCompile(`^\$[a-zA-Z_][a-zA-Z0-9_]*(?:->[a-zA-Z_][a-zA-Z0-9_]*|\[['"][a-zA-Z0-9_]+['"]\])*$`)
-	reIdent    = regexp.MustCompile(`[a-zA-Z_][a-zA-Z0-9_]*`)
-	reForeach  = regexp.MustCompile(`^foreach\s*\(\s*(\$?[a-zA-Z0-9_>\[\]'"]+)\s+as\s+(?:(\$[a-zA-Z0-9_]+)\s*=>\s*)?(\$[a-zA-Z0-9_]+)\s*\)\s*[:{]?$`)
-	reIf       = regexp.MustCompile(`^if\s*\((.*)\)\s*[:{]$`)
-	reElseIf   = regexp.MustCompile(`^(?:\}\s*)?else\s*if\s*\((.*)\)\s*[:{]?$|^(?:\}\s*)?elseif\s*\((.*)\)\s*[:{]?$`)
-	reViewLoad = regexp.MustCompile(`^\$this->load->view\(\s*['"]([^'"]+)['"]`)
-	reBaseURL  = regexp.MustCompile(`^base_url\((.*)\)$`)
-	reSiteURL  = regexp.MustCompile(`^site_url\((.*)\)$`)
-	reEscaping = regexp.MustCompile(`^(?:htmlspecialchars|htmlentities)\((.*)\)$`)
+	reVarExpr    = regexp.MustCompile(`^\$[a-zA-Z_][a-zA-Z0-9_]*(?:->[a-zA-Z_][a-zA-Z0-9_]*|\[['"][a-zA-Z0-9_]+['"]\])*$`)
+	reIdent      = regexp.MustCompile(`[a-zA-Z_][a-zA-Z0-9_]*`)
+	reForeach    = regexp.MustCompile(`^foreach\s*\(\s*(\$?[a-zA-Z0-9_\->\[\]'"]+(?:\s*->\s*result(?:_array)?\s*\(\s*\))?)\s+as\s+(?:(\$[a-zA-Z0-9_]+)\s*=>\s*)?(\$[a-zA-Z0-9_]+)\s*\)\s*[:{]?$`)
+	reResultCall = regexp.MustCompile(`\s*->\s*result(?:_array)?\s*\(\s*\)$`)
+	reIf         = regexp.MustCompile(`^if\s*\((.*)\)\s*[:{]$`)
+	reElseIf     = regexp.MustCompile(`^(?:\}\s*)?else\s*if\s*\((.*)\)\s*[:{]?$|^(?:\}\s*)?elseif\s*\((.*)\)\s*[:{]?$`)
+	reViewLoad   = regexp.MustCompile(`^\$this->load->view\(\s*['"]([^'"]+)['"]`)
+	reBaseURL    = regexp.MustCompile(`^base_url\((.*)\)$`)
+	reSiteURL    = regexp.MustCompile(`^site_url\((.*)\)$`)
+	reEscaping   = regexp.MustCompile(`^(?:htmlspecialchars|htmlentities|html_escape)\((.*)\)$`)
 )
 
 type blockType int
@@ -42,8 +43,11 @@ type loopScope struct {
 }
 
 type viewTranspiler struct {
-	loopStack  []loopScope
-	blockStack []blockState
+	loopStack          []loopScope
+	blockStack         []blockState
+	failedIfDepth      int
+	failedForeachDepth int
+	failedBraceDepth   int
 }
 
 func (vt *viewTranspiler) pushLoop(itemVar, keyVar string) {
@@ -55,31 +59,35 @@ func (vt *viewTranspiler) pushIf() {
 	vt.blockStack = append(vt.blockStack, blockState{kind: blockIf})
 }
 
-func (vt *viewTranspiler) popLoop() {
-	if len(vt.loopStack) > 0 {
-		vt.loopStack = vt.loopStack[:len(vt.loopStack)-1]
-	}
+func (vt *viewTranspiler) popLoop() bool {
 	if len(vt.blockStack) > 0 && vt.blockStack[len(vt.blockStack)-1].kind == blockForeach {
 		vt.blockStack = vt.blockStack[:len(vt.blockStack)-1]
+		if len(vt.loopStack) > 0 {
+			vt.loopStack = vt.loopStack[:len(vt.loopStack)-1]
+		}
+		return true
 	}
+	return false
 }
 
-func (vt *viewTranspiler) popIf() {
+func (vt *viewTranspiler) popIf() bool {
 	if len(vt.blockStack) > 0 && vt.blockStack[len(vt.blockStack)-1].kind == blockIf {
 		vt.blockStack = vt.blockStack[:len(vt.blockStack)-1]
+		return true
 	}
+	return false
 }
 
-func (vt *viewTranspiler) popAnyBlock() {
+func (vt *viewTranspiler) popAnyBlock() bool {
 	if len(vt.blockStack) > 0 {
 		last := vt.blockStack[len(vt.blockStack)-1]
 		vt.blockStack = vt.blockStack[:len(vt.blockStack)-1]
 		if last.kind == blockForeach && len(vt.loopStack) > 0 {
 			vt.loopStack = vt.loopStack[:len(vt.loopStack)-1]
 		}
-	} else if len(vt.loopStack) > 0 {
-		vt.loopStack = vt.loopStack[:len(vt.loopStack)-1]
+		return true
 	}
+	return false
 }
 
 func (vt *viewTranspiler) currentLoopVar() string {
@@ -253,66 +261,118 @@ func (vt *viewTranspiler) transpilePHPBlock(rawCode string, isShortEcho bool) st
 		return "{{ .csrf_token }}"
 	}
 
+	clean := stripTrailingComment(trimmed)
+
 	// 5. Loops: foreach
-	if strings.HasPrefix(trimmed, "foreach") {
-		if m := reForeach.FindStringSubmatch(trimmed); m != nil {
+	if strings.HasPrefix(clean, "foreach") {
+		if m := reForeach.FindStringSubmatch(clean); m != nil {
 			targetArray := strings.TrimSpace(m[1])
 			keyVar := strings.TrimPrefix(strings.TrimSpace(m[2]), "$")
 			itemVar := strings.TrimPrefix(strings.TrimSpace(m[3]), "$")
 
-			vt.pushLoop(itemVar, keyVar)
+			// Support ->result() and ->result_array()
+			targetArray = reResultCall.ReplaceAllString(targetArray, "")
+
 			targetTpl := vt.transpileVariableRef(targetArray)
-			return fmt.Sprintf("{{ range %s }}", targetTpl)
+			if targetTpl != "" {
+				vt.pushLoop(itemVar, keyVar)
+				return fmt.Sprintf("{{ range %s }}", targetTpl)
+			}
 		}
+		if strings.HasSuffix(clean, "{") {
+			vt.failedBraceDepth++
+		} else {
+			vt.failedForeachDepth++
+		}
+		safeCode := strings.ReplaceAll(trimmed, "*/", "* /")
+		return fmt.Sprintf("{{/* TODO_MIGRATE: %s */}}", safeCode)
 	}
-	if strings.HasPrefix(trimmed, "endforeach") {
-		vt.popLoop()
-		return "{{ end }}"
+	if strings.HasPrefix(clean, "endforeach") {
+		if vt.failedForeachDepth > 0 {
+			vt.failedForeachDepth--
+			safeCode := strings.ReplaceAll(trimmed, "*/", "* /")
+			return fmt.Sprintf("{{/* TODO_MIGRATE: %s */}}", safeCode)
+		}
+		if vt.popLoop() {
+			return "{{ end }}"
+		}
+		safeCode := strings.ReplaceAll(trimmed, "*/", "* /")
+		return fmt.Sprintf("{{/* TODO_MIGRATE: %s */}}", safeCode)
 	}
 
 	// 6. Conditionals
-	if strings.HasPrefix(trimmed, "if") && (strings.HasSuffix(trimmed, ":") || strings.HasSuffix(trimmed, "{")) {
-		if m := reIf.FindStringSubmatch(trimmed); m != nil {
-			vt.pushIf()
+	if strings.HasPrefix(clean, "if") && (strings.HasSuffix(clean, ":") || strings.HasSuffix(clean, "{")) {
+		if m := reIf.FindStringSubmatch(clean); m != nil {
 			cond := strings.TrimSpace(m[1])
-			tplCond := vt.transpileCondition(cond)
-			return fmt.Sprintf("{{ if %s }}", tplCond)
+			tplCond, ok := vt.transpileCondition(cond)
+			if ok {
+				vt.pushIf()
+				return fmt.Sprintf("{{ if %s }}", tplCond)
+			}
 		}
+		if strings.HasSuffix(clean, "{") {
+			vt.failedBraceDepth++
+		} else {
+			vt.failedIfDepth++
+		}
+		safeCode := strings.ReplaceAll(trimmed, "*/", "* /")
+		return fmt.Sprintf("{{/* TODO_MIGRATE: %s */}}", safeCode)
 	}
-	if strings.HasPrefix(trimmed, "elseif") || strings.HasPrefix(trimmed, "else if") ||
-		strings.HasPrefix(trimmed, "} elseif") || strings.HasPrefix(trimmed, "} else if") {
-		if m := reElseIf.FindStringSubmatch(trimmed); m != nil {
+	if strings.HasPrefix(clean, "elseif") || strings.HasPrefix(clean, "else if") ||
+		strings.HasPrefix(clean, "} elseif") || strings.HasPrefix(clean, "} else if") {
+		if m := reElseIf.FindStringSubmatch(clean); m != nil {
 			cond := m[1]
 			if cond == "" {
 				cond = m[2]
 			}
 			cond = strings.TrimSpace(cond)
-			tplCond := vt.transpileCondition(cond)
-			return fmt.Sprintf("{{ else if %s }}", tplCond)
+			tplCond, ok := vt.transpileCondition(cond)
+			if ok {
+				return fmt.Sprintf("{{ else if %s }}", tplCond)
+			}
 		}
+		safeCode := strings.ReplaceAll(trimmed, "*/", "* /")
+		return fmt.Sprintf("{{/* TODO_MIGRATE: %s */}}", safeCode)
 	}
-	if trimmed == "else:" || trimmed == "else {" || trimmed == "} else {" || trimmed == "} else:" {
+	if clean == "else:" || clean == "else {" || clean == "} else {" || clean == "} else:" {
 		return "{{ else }}"
 	}
-	if strings.HasPrefix(trimmed, "endif") {
-		vt.popIf()
-		return "{{ end }}"
+	if strings.HasPrefix(clean, "endif") {
+		if vt.failedIfDepth > 0 {
+			vt.failedIfDepth--
+			safeCode := strings.ReplaceAll(trimmed, "*/", "* /")
+			return fmt.Sprintf("{{/* TODO_MIGRATE: %s */}}", safeCode)
+		}
+		if vt.popIf() {
+			return "{{ end }}"
+		}
+		safeCode := strings.ReplaceAll(trimmed, "*/", "* /")
+		return fmt.Sprintf("{{/* TODO_MIGRATE: %s */}}", safeCode)
 	}
-	if trimmed == "}" || strings.HasPrefix(trimmed, "} //") || strings.HasPrefix(trimmed, "}/*") {
-		vt.popAnyBlock()
-		return "{{ end }}"
+	if clean == "}" {
+		if vt.failedBraceDepth > 0 {
+			vt.failedBraceDepth--
+			safeCode := strings.ReplaceAll(trimmed, "*/", "* /")
+			return fmt.Sprintf("{{/* TODO_MIGRATE: %s */}}", safeCode)
+		}
+		if vt.popAnyBlock() {
+			return "{{ end }}"
+		}
+		safeCode := strings.ReplaceAll(trimmed, "*/", "* /")
+		return fmt.Sprintf("{{/* TODO_MIGRATE: %s */}}", safeCode)
 	}
 
 	// 7. Echo / Print / Short Echo expressions
 	var expr string
 	isEcho := false
 
+	trimmedForEcho := stripTrailingComment(trimmed)
 	if isShortEcho {
-		expr = strings.TrimSuffix(trimmed, ";")
+		expr = strings.TrimSuffix(trimmedForEcho, ";")
 		expr = strings.TrimSpace(expr)
 		isEcho = true
-	} else if strings.HasPrefix(trimmed, "echo ") || strings.HasPrefix(trimmed, "echo(") {
-		expr = strings.TrimPrefix(trimmed, "echo")
+	} else if strings.HasPrefix(trimmedForEcho, "echo ") || strings.HasPrefix(trimmedForEcho, "echo(") {
+		expr = strings.TrimPrefix(trimmedForEcho, "echo")
 		expr = strings.TrimSpace(expr)
 		expr = strings.TrimSuffix(expr, ";")
 		expr = strings.TrimSpace(expr)
@@ -320,8 +380,8 @@ func (vt *viewTranspiler) transpilePHPBlock(rawCode string, isShortEcho bool) st
 			expr = strings.TrimSpace(expr[1 : len(expr)-1])
 		}
 		isEcho = true
-	} else if strings.HasPrefix(trimmed, "print ") || strings.HasPrefix(trimmed, "print(") {
-		expr = strings.TrimPrefix(trimmed, "print")
+	} else if strings.HasPrefix(trimmedForEcho, "print ") || strings.HasPrefix(trimmedForEcho, "print(") {
+		expr = strings.TrimPrefix(trimmedForEcho, "print")
 		expr = strings.TrimSpace(expr)
 		expr = strings.TrimSuffix(expr, ";")
 		expr = strings.TrimSpace(expr)
@@ -380,6 +440,10 @@ func (vt *viewTranspiler) transpileVariableRef(rawVar string) string {
 		return ""
 	}
 
+	if !isVarExpr(rawVar) {
+		return ""
+	}
+
 	parts := reIdent.FindAllString(rawVar, -1)
 	if len(parts) == 0 {
 		return ""
@@ -400,44 +464,111 @@ func (vt *viewTranspiler) transpileVariableRef(rawVar string) string {
 	return "." + strings.Join(converted, ".")
 }
 
-func (vt *viewTranspiler) transpileCondition(cond string) string {
+func (vt *viewTranspiler) transpileCondition(cond string) (string, bool) {
 	cond = strings.TrimSpace(cond)
 	for strings.HasPrefix(cond, "(") && strings.HasSuffix(cond, ")") && isValidParenthesized(cond) {
 		cond = strings.TrimSpace(cond[1 : len(cond)-1])
 	}
 
-	// Negation check
+	if cond == "" {
+		return "", false
+	}
+
+	// 1. Logical OR (||) outside quotes and parentheses
+	orParts := splitOpOutsideQuotesAndParens(cond, "||")
+	if len(orParts) > 1 {
+		var tplParts []string
+		for _, p := range orParts {
+			p = strings.TrimSpace(p)
+			if p == "" {
+				return "", false
+			}
+			t, ok := vt.transpileCondition(p)
+			if !ok {
+				return "", false
+			}
+			tplParts = append(tplParts, parenthesizeIfCompound(t))
+		}
+		return "or " + strings.Join(tplParts, " "), true
+	}
+
+	// 2. Logical AND (&&) outside quotes and parentheses
+	andParts := splitOpOutsideQuotesAndParens(cond, "&&")
+	if len(andParts) > 1 {
+		var tplParts []string
+		for _, p := range andParts {
+			p = strings.TrimSpace(p)
+			if p == "" {
+				return "", false
+			}
+			t, ok := vt.transpileCondition(p)
+			if !ok {
+				return "", false
+			}
+			tplParts = append(tplParts, parenthesizeIfCompound(t))
+		}
+		return "and " + strings.Join(tplParts, " "), true
+	}
+
+	// 3. Negation check
 	if strings.HasPrefix(cond, "!") {
 		inner := strings.TrimSpace(cond[1:])
 		if strings.HasPrefix(inner, "empty(") && strings.HasSuffix(inner, ")") {
 			arg := strings.TrimSpace(inner[6 : len(inner)-1])
-			return vt.transpileVariableRef(arg)
+			if !isVarExpr(arg) {
+				return "", false
+			}
+			ref := vt.transpileVariableRef(arg)
+			if ref == "" {
+				return "", false
+			}
+			return ref, true
 		}
 		if strings.HasPrefix(inner, "isset(") && strings.HasSuffix(inner, ")") {
 			arg := strings.TrimSpace(inner[6 : len(inner)-1])
-			return "not " + vt.transpileVariableRef(arg)
+			if !isVarExpr(arg) {
+				return "", false
+			}
+			ref := vt.transpileVariableRef(arg)
+			if ref == "" {
+				return "", false
+			}
+			return "not " + ref, true
 		}
-		return "not " + vt.transpileCondition(inner)
+		t, ok := vt.transpileCondition(inner)
+		if !ok {
+			return "", false
+		}
+		return "not " + parenthesizeIfCompound(t), true
 	}
 
-	// empty(...) check
+	// 4. empty(...) check
 	if strings.HasPrefix(cond, "empty(") && strings.HasSuffix(cond, ")") {
 		arg := strings.TrimSpace(cond[6 : len(cond)-1])
-		return "not " + vt.transpileVariableRef(arg)
+		if !isVarExpr(arg) {
+			return "", false
+		}
+		ref := vt.transpileVariableRef(arg)
+		if ref == "" {
+			return "", false
+		}
+		return "not " + ref, true
 	}
 
-	// isset(...) check
+	// 5. isset(...) check
 	if strings.HasPrefix(cond, "isset(") && strings.HasSuffix(cond, ")") {
 		arg := strings.TrimSpace(cond[6 : len(cond)-1])
-		return vt.transpileVariableRef(arg)
+		if !isVarExpr(arg) {
+			return "", false
+		}
+		ref := vt.transpileVariableRef(arg)
+		if ref == "" {
+			return "", false
+		}
+		return ref, true
 	}
 
-	// Plain variable
-	if reVarExpr.MatchString(cond) {
-		return vt.transpileVariableRef(cond)
-	}
-
-	// Binary comparison operators
+	// 6. Binary comparison operators
 	ops := []struct {
 		phpOp string
 		goOp  string
@@ -453,39 +584,39 @@ func (vt *viewTranspiler) transpileCondition(cond string) string {
 	}
 
 	for _, entry := range ops {
-		idx := findOpOutsideQuotes(cond, entry.phpOp)
+		idx := findOpOutsideQuotesAndParens(cond, entry.phpOp)
 		if idx != -1 {
 			left := strings.TrimSpace(cond[:idx])
 			right := strings.TrimSpace(cond[idx+len(entry.phpOp):])
 
-			var leftTpl string
-			if strings.HasPrefix(left, "$") {
-				leftTpl = vt.transpileVariableRef(left)
-			} else {
-				leftTpl = left
+			leftTpl, leftOk := transpileOperand(left, vt)
+			if !leftOk {
+				return "", false
 			}
 
-			var rightTpl string
-			if strings.HasPrefix(right, "$") {
-				rightTpl = vt.transpileVariableRef(right)
-			} else if (strings.HasPrefix(right, "'") && strings.HasSuffix(right, "'")) ||
-				(strings.HasPrefix(right, "\"") && strings.HasSuffix(right, "\"")) {
-				lit := right[1 : len(right)-1]
-				rightTpl = fmt.Sprintf("%q", lit)
-			} else {
-				rightTpl = right
+			rightTpl, rightOk := transpileOperand(right, vt)
+			if !rightOk {
+				return "", false
 			}
 
-			return fmt.Sprintf("%s %s %s", entry.goOp, leftTpl, rightTpl)
+			return fmt.Sprintf("%s %s %s", entry.goOp, leftTpl, rightTpl), true
 		}
 	}
 
-	// Plain variable
-	if strings.HasPrefix(cond, "$") {
-		return vt.transpileVariableRef(cond)
+	// 7. Plain variable expression
+	if isVarExpr(cond) {
+		ref := vt.transpileVariableRef(cond)
+		if ref != "" {
+			return ref, true
+		}
 	}
 
-	return cond
+	// 8. Plain literal / boolean
+	if opRes, ok := transpileOperand(cond, vt); ok {
+		return opRes, true
+	}
+
+	return "", false
 }
 
 func (vt *viewTranspiler) transpileURLArg(rawArg string) string {
@@ -646,9 +777,11 @@ func extractParenContent(s string) string {
 	return strings.TrimSpace(s[start:])
 }
 
-func findOpOutsideQuotes(s, op string) int {
+func findOpOutsideQuotesAndParens(s, op string) int {
 	inQuote := byte(0)
 	escaped := false
+	parenDepth := 0
+	bracketDepth := 0
 
 	for i := 0; i <= len(s)-len(op); i++ {
 		c := s[i]
@@ -663,7 +796,15 @@ func findOpOutsideQuotes(s, op string) int {
 		if inQuote == 0 {
 			if c == '\'' || c == '"' {
 				inQuote = c
-			} else if s[i:i+len(op)] == op {
+			} else if c == '(' {
+				parenDepth++
+			} else if c == ')' {
+				parenDepth--
+			} else if c == '[' {
+				bracketDepth++
+			} else if c == ']' {
+				bracketDepth--
+			} else if parenDepth == 0 && bracketDepth == 0 && s[i:i+len(op)] == op {
 				// Prevent matching '>' inside '->'
 				if op == ">" && i > 0 && s[i-1] == '-' {
 					continue
@@ -676,6 +817,14 @@ func findOpOutsideQuotes(s, op string) int {
 				if op == "<" && i+1 < len(s) && (s[i+1] == '=' || s[i+1] == '<') {
 					continue
 				}
+				// Prevent matching '==' inside '==='
+				if op == "==" && i+2 < len(s) && s[i+2] == '=' {
+					continue
+				}
+				// Prevent matching '!=' inside '!=='
+				if op == "!=" && i+2 < len(s) && s[i+2] == '=' {
+					continue
+				}
 				return i
 			}
 		} else {
@@ -685,6 +834,172 @@ func findOpOutsideQuotes(s, op string) int {
 		}
 	}
 	return -1
+}
+
+func isVarExpr(s string) bool {
+	s = strings.TrimSpace(s)
+	if s == "" {
+		return false
+	}
+	if !strings.HasPrefix(s, "$") {
+		s = "$" + s
+	}
+	return reVarExpr.MatchString(s)
+}
+
+func transpileOperand(operand string, vt *viewTranspiler) (string, bool) {
+	operand = strings.TrimSpace(operand)
+	if operand == "" {
+		return "", false
+	}
+	if isVarExpr(operand) {
+		res := vt.transpileVariableRef(operand)
+		if res != "" {
+			return res, true
+		}
+	}
+	switch strings.ToLower(operand) {
+	case "true":
+		return "true", true
+	case "false":
+		return "false", true
+	case "null":
+		return "nil", true
+	}
+	if isNumericLiteral(operand) {
+		return operand, true
+	}
+	if (strings.HasPrefix(operand, "'") && strings.HasSuffix(operand, "'")) ||
+		(strings.HasPrefix(operand, "\"") && strings.HasSuffix(operand, "\"")) {
+		if len(operand) >= 2 {
+			lit := operand[1 : len(operand)-1]
+			return fmt.Sprintf("%q", lit), true
+		}
+	}
+	return "", false
+}
+
+func isNumericLiteral(s string) bool {
+	if s == "" {
+		return false
+	}
+	start := 0
+	if s[0] == '-' || s[0] == '+' {
+		start = 1
+	}
+	if start >= len(s) {
+		return false
+	}
+	hasDot := false
+	for i := start; i < len(s); i++ {
+		if s[i] == '.' {
+			if hasDot {
+				return false
+			}
+			hasDot = true
+		} else if s[i] < '0' || s[i] > '9' {
+			return false
+		}
+	}
+	return true
+}
+
+func parenthesizeIfCompound(expr string) string {
+	expr = strings.TrimSpace(expr)
+	if strings.HasPrefix(expr, "(") && strings.HasSuffix(expr, ")") && isValidParenthesized(expr) {
+		return expr
+	}
+	if strings.HasPrefix(expr, "\"") && strings.HasSuffix(expr, "\"") {
+		return expr
+	}
+	if strings.Contains(expr, " ") {
+		return "(" + expr + ")"
+	}
+	return expr
+}
+
+func stripTrailingComment(s string) string {
+	inQuote := byte(0)
+	escaped := false
+	for i := 0; i < len(s); i++ {
+		c := s[i]
+		if escaped {
+			escaped = false
+			continue
+		}
+		if c == '\\' && inQuote != 0 {
+			escaped = true
+			continue
+		}
+		if inQuote == 0 {
+			if c == '\'' || c == '"' {
+				inQuote = c
+			} else if c == '/' && i+1 < len(s) && s[i+1] == '/' {
+				return strings.TrimSpace(s[:i])
+			} else if c == '/' && i+1 < len(s) && s[i+1] == '*' {
+				closeIdx := strings.Index(s[i+2:], "*/")
+				if closeIdx != -1 {
+					after := strings.TrimSpace(s[i+2+closeIdx+2:])
+					if after == "" {
+						return strings.TrimSpace(s[:i])
+					}
+				}
+			}
+		} else {
+			if c == inQuote {
+				inQuote = 0
+			}
+		}
+	}
+	return strings.TrimSpace(s)
+}
+
+func splitOpOutsideQuotesAndParens(s, op string) []string {
+	var parts []string
+	inQuote := byte(0)
+	escaped := false
+	parenDepth := 0
+	bracketDepth := 0
+	start := 0
+
+	for i := 0; i <= len(s)-len(op); i++ {
+		c := s[i]
+		if escaped {
+			escaped = false
+			continue
+		}
+		if c == '\\' && inQuote != 0 {
+			escaped = true
+			continue
+		}
+		if inQuote == 0 {
+			if c == '\'' || c == '"' {
+				inQuote = c
+			} else if c == '(' {
+				parenDepth++
+			} else if c == ')' {
+				parenDepth--
+			} else if c == '[' {
+				bracketDepth++
+			} else if c == ']' {
+				bracketDepth--
+			} else if parenDepth == 0 && bracketDepth == 0 {
+				if s[i:i+len(op)] == op {
+					parts = append(parts, strings.TrimSpace(s[start:i]))
+					start = i + len(op)
+					i = start - 1
+				}
+			}
+		} else {
+			if c == inQuote {
+				inQuote = 0
+			}
+		}
+	}
+	if start <= len(s) {
+		parts = append(parts, strings.TrimSpace(s[start:]))
+	}
+	return parts
 }
 
 func isValidParenthesized(s string) bool {

@@ -1,6 +1,7 @@
 package scripts
 
 import (
+	"html/template"
 	"os"
 	"path/filepath"
 	"strings"
@@ -42,6 +43,21 @@ func TestView2GoTpl_VariableEchoes(t *testing.T) {
 			name:     "htmlentities function",
 			input:    "<?= htmlentities($title) ?>",
 			expected: "{{ .Title }}",
+		},
+		{
+			name:     "html_escape function",
+			input:    "<?= html_escape($title) ?>",
+			expected: "{{ .Title }}",
+		},
+		{
+			name:     "php echo html_escape",
+			input:    "<?php echo html_escape($title); ?>",
+			expected: "{{ .Title }}",
+		},
+		{
+			name:     "html_escape with object property",
+			input:    "<?= html_escape($user->email) ?>",
+			expected: "{{ .User.Email }}",
 		},
 		{
 			name:     "embedded inside html tag",
@@ -159,6 +175,31 @@ func TestView2GoTpl_Conditionals(t *testing.T) {
 			input:    "<?php if ($count > 0): ?> Has items <?php endif; ?>",
 			expected: "{{ if gt .Count 0 }} Has items {{ end }}",
 		},
+		{
+			name:     "compound && condition",
+			input:    "<?php if ($logged_in && $is_admin): ?> Admin <?php endif; ?>",
+			expected: "{{ if and .LoggedIn .IsAdmin }} Admin {{ end }}",
+		},
+		{
+			name:     "compound || condition",
+			input:    "<?php if ($logged_in || $is_admin): ?> Welcome <?php endif; ?>",
+			expected: "{{ if or .LoggedIn .IsAdmin }} Welcome {{ end }}",
+		},
+		{
+			name:     "compound condition with comparison and variable",
+			input:    "<?php if ($count > 0 && $logged_in): ?> Has items <?php endif; ?>",
+			expected: "{{ if and (gt .Count 0) .LoggedIn }} Has items {{ end }}",
+		},
+		{
+			name:     "never silently rewrite $a && $b to .A.B",
+			input:    "<?php if ($a && $b): ?> Ok <?php endif; ?>",
+			expected: "{{ if and .A .B }} Ok {{ end }}",
+		},
+		{
+			name:     "trailing comments on control lines",
+			input:    "<?php if ($logged_in): // check auth ?> Welcome <?php else: // default ?> Guest <?php endif; // end check ?>",
+			expected: "{{ if .LoggedIn }} Welcome {{ else }} Guest {{ end }}",
+		},
 	}
 
 	for _, tt := range tests {
@@ -196,6 +237,26 @@ func TestView2GoTpl_Loops(t *testing.T) {
 			name:     "foreach brace syntax",
 			input:    "<?php foreach ($items as $item) { ?> <div><?= $item->title ?></div> <?php } ?>",
 			expected: "{{ range .Items }} <div>{{ .Title }}</div> {{ end }}",
+		},
+		{
+			name:     "nested loops order of evaluation",
+			input:    "<?php foreach ($users as $user): ?> <?php foreach ($user->roles as $role): ?> <span><?= $role->name ?></span> <?php endforeach; ?> <?php endforeach; ?>",
+			expected: "{{ range .Users }} {{ range .Roles }} <span>{{ .Name }}</span> {{ end }} {{ end }}",
+		},
+		{
+			name:     "foreach with ->result()",
+			input:    "<?php foreach ($query->result() as $row): ?> <li><?= $row->title ?></li> <?php endforeach; ?>",
+			expected: "{{ range .Query }} <li>{{ .Title }}</li> {{ end }}",
+		},
+		{
+			name:     "foreach with ->result_array()",
+			input:    "<?php foreach ($users->result_array() as $user): ?> <li><?= $user['name'] ?></li> <?php endforeach; ?>",
+			expected: "{{ range .Users }} <li>{{ .Name }}</li> {{ end }}",
+		},
+		{
+			name:     "foreach with trailing comment",
+			input:    "<?php foreach ($users as $user): // loop users ?> <span><?= $user->name ?></span> <?php endforeach; // done ?>",
+			expected: "{{ range .Users }} <span>{{ .Name }}</span> {{ end }}",
 		},
 	}
 
@@ -470,5 +531,65 @@ func TestView2GoTpl_CLI(t *testing.T) {
 	errMissing := RunView2GoTplCLI([]string{"-out", outDir})
 	if errMissing == nil {
 		t.Errorf("expected error when -src is missing, got nil")
+	}
+}
+
+func TestView2GoTpl_BlockStackAndUnconvertible(t *testing.T) {
+	tests := []struct {
+		name          string
+		input         string
+		expected      string
+		validateParse bool
+	}{
+		{
+			name:          "unconvertible if does not produce orphaned end",
+			input:         "<?php if ($calc + compute_hash($a) > 10): ?> <div>Special</div> <?php endif; ?>",
+			expected:      "{{/* TODO_MIGRATE: if ($calc + compute_hash($a) > 10): */}} <div>Special</div> {{/* TODO_MIGRATE: endif; */}}",
+			validateParse: true,
+		},
+		{
+			name:          "unconvertible foreach does not produce orphaned end",
+			input:         "<?php foreach (get_custom_generator($a, $b) as $item): ?> <li><?= $item ?></li> <?php endforeach; ?>",
+			expected:      "{{/* TODO_MIGRATE: foreach (get_custom_generator($a, $b) as $item): */}} <li>{{ .Item }}</li> {{/* TODO_MIGRATE: endforeach; */}}",
+			validateParse: true,
+		},
+		{
+			name:          "unconvertible if inside valid foreach preserves outer loop matching",
+			input:         "<?php foreach ($users as $user): ?> <?php if ($complex + 1): ?> <span><?= $user->name ?></span> <?php endif; ?> <?php endforeach; ?>",
+			expected:      "{{ range .Users }} {{/* TODO_MIGRATE: if ($complex + 1): */}} <span>{{ .Name }}</span> {{/* TODO_MIGRATE: endif; */}} {{ end }}",
+			validateParse: true,
+		},
+		{
+			name:          "unconvertible brace if does not produce orphaned end",
+			input:         "<?php if ($calc + 1) { ?> <div>Special</div> <?php } ?>",
+			expected:      "{{/* TODO_MIGRATE: if ($calc + 1) { */}} <div>Special</div> {{/* TODO_MIGRATE: } */}}",
+			validateParse: true,
+		},
+		{
+			name:          "orphaned endif with no opener",
+			input:         "<?php endif; ?>",
+			expected:      "{{/* TODO_MIGRATE: endif; */}}",
+			validateParse: true,
+		},
+		{
+			name:          "orphaned endforeach with no opener",
+			input:         "<?php endforeach; ?>",
+			expected:      "{{/* TODO_MIGRATE: endforeach; */}}",
+			validateParse: true,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			got := TranspilePHPViewToTemplate(tt.input)
+			if got != tt.expected {
+				t.Errorf("TranspilePHPViewToTemplate(%q) = %q, want %q", tt.input, got, tt.expected)
+			}
+			if tt.validateParse {
+				if _, err := template.New("test").Parse(got); err != nil {
+					t.Errorf("transpiled template failed to parse in html/template: %v\nTemplate:\n%s", err, got)
+				}
+			}
+		})
 	}
 }
