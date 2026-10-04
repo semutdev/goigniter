@@ -28,8 +28,10 @@ func main() {
 			os.Exit(1)
 		}
 	case "view2gotpl":
-		fmt.Fprintf(os.Stderr, "view2gotpl subcommand not yet implemented (coming in Task 4)\n")
-		os.Exit(1)
+		if err := scripts.RunView2GoTplCLI(args); err != nil {
+			fmt.Fprintf(os.Stderr, "Error: %v\n", err)
+			os.Exit(1)
+		}
 	case "-h", "--help", "help":
 		printUsage()
 	default:
