@@ -170,6 +170,45 @@ func (c *Context) Bind(dest any) error {
 	}
 }
 
+// BindWithLimit binds JSON body with a maximum size limit (in bytes).
+// Prevents memory exhaustion attacks from large request bodies.
+func (c *Context) BindWithLimit(dest any, maxBytes int64) error {
+	// Check Content-Length header first
+	if c.Request.ContentLength > maxBytes {
+		return ErrBodyTooLarge
+	}
+
+	// Limit the reader
+	limitedReader := io.LimitReader(c.Request.Body, maxBytes+1)
+	decoder := json.NewDecoder(limitedReader)
+
+	err := decoder.Decode(dest)
+	if err != nil {
+		if err.Error() == "http: request body too large" {
+			return ErrBodyTooLarge
+		}
+		return err
+	}
+
+	return nil
+}
+
+// BodyWithLimit reads the request body with a size limit.
+func (c *Context) BodyWithLimit(maxBytes int64) ([]byte, error) {
+	if c.Request.ContentLength > maxBytes {
+		return nil, ErrBodyTooLarge
+	}
+	limitedReader := io.LimitReader(c.Request.Body, maxBytes+1)
+	body, err := io.ReadAll(limitedReader)
+	if err != nil {
+		return nil, err
+	}
+	if int64(len(body)) > maxBytes {
+		return nil, ErrBodyTooLarge
+	}
+	return body, nil
+}
+
 func (c *Context) Body() ([]byte, error) {
 	return io.ReadAll(c.Request.Body)
 }
@@ -287,5 +326,17 @@ type TemplateError struct {
 }
 
 func (e *TemplateError) Error() string {
+	return e.Message
+}
+
+// ErrBodyTooLarge is returned when the request body exceeds the limit.
+var ErrBodyTooLarge = &BodySizeError{Message: "request body too large"}
+
+// BodySizeError represents an error when request body is too large.
+type BodySizeError struct {
+	Message string
+}
+
+func (e *BodySizeError) Error() string {
 	return e.Message
 }

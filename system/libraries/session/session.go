@@ -1,6 +1,8 @@
 package session
 
 import (
+	"crypto/aes"
+	"crypto/cipher"
 	"crypto/hmac"
 	"crypto/rand"
 	"crypto/sha256"
@@ -16,14 +18,16 @@ import (
 
 // Config holds session configuration.
 type Config struct {
-	Secret     string        // HMAC signing key (required)
-	CookieName string        // Cookie name (default: "goigniter_session")
-	MaxAge     int           // Session max age in seconds (default: 86400)
-	Path       string        // Cookie path (default: "/")
-	Domain     string        // Cookie domain
-	HttpOnly   bool          // HTTP only flag (default: true)
-	Secure     bool          // Secure flag (default: false)
-	SameSite   http.SameSite // SameSite policy (default: Lax)
+	Secret      string        // HMAC signing key (required, min 32 bytes recommended)
+	CookieName  string        // Cookie name (default: "goigniter_session")
+	MaxAge      int           // Session max age in seconds (default: 86400)
+	Path        string        // Cookie path (default: "/")
+	Domain      string        // Cookie domain
+	HttpOnly    bool          // HTTP only flag (default: true)
+	Secure      bool          // Secure flag (default: false, set true in production)
+	SameSite    http.SameSite // SameSite policy (default: Lax)
+	Encrypt     bool          // Enable encryption (default: false, requires 32-byte key)
+	EncryptKey  []byte        // Encryption key (32 bytes for AES-256)
 }
 
 // Session represents a user session.
@@ -56,6 +60,13 @@ func Init(cfg Config) {
 			config.SameSite = http.SameSiteLaxMode
 		}
 		config.HttpOnly = true // Always true for security
+
+		// Validate encryption key if encryption is enabled
+		if config.Encrypt {
+			if len(config.EncryptKey) != 32 {
+				panic("session: EncryptKey must be 32 bytes for AES-256 encryption")
+			}
+		}
 	})
 }
 
@@ -211,7 +222,7 @@ func HasFlash(c *core.Context, key string) bool {
 
 // --- Internal Functions ---
 
-// encode encodes and signs a session.
+// encode encodes and signs a session (optionally encrypts if enabled).
 func encode(s *Session) (string, error) {
 	// JSON encode
 	data, err := json.Marshal(s)
@@ -219,10 +230,20 @@ func encode(s *Session) (string, error) {
 		return "", err
 	}
 
-	// Base64 encode
-	encoded := base64.URLEncoding.EncodeToString(data)
+	var payload []byte
+	if config.Encrypt && len(config.EncryptKey) == 32 {
+		// Encrypt
+		payload, err = encrypt(data, config.EncryptKey)
+		if err != nil {
+			return "", err
+		}
+	} else {
+		// Base64 encode only
+		payload = []byte(base64.URLEncoding.EncodeToString(data))
+	}
 
 	// Sign with HMAC
+	encoded := string(payload)
 	signature := sign(encoded)
 
 	// Return encoded.signature
@@ -244,10 +265,21 @@ func decode(value string) (*Session, error) {
 		return nil, ErrInvalidSignature
 	}
 
-	// Base64 decode
-	data, err := base64.URLEncoding.DecodeString(encoded)
-	if err != nil {
-		return nil, err
+	var data []byte
+	var err error
+
+	if config.Encrypt && len(config.EncryptKey) == 32 {
+		// Decrypt
+		data, err = decrypt([]byte(encoded), config.EncryptKey)
+		if err != nil {
+			return nil, ErrInvalidSession
+		}
+	} else {
+		// Base64 decode
+		data, err = base64.URLEncoding.DecodeString(encoded)
+		if err != nil {
+			return nil, err
+		}
 	}
 
 	// JSON decode
@@ -270,6 +302,58 @@ func sign(data string) string {
 func verify(data, signature string) bool {
 	expected := sign(data)
 	return hmac.Equal([]byte(expected), []byte(signature))
+}
+
+// encrypt encrypts data using AES-GCM.
+func encrypt(plaintext, key []byte) ([]byte, error) {
+	block, err := aes.NewCipher(key)
+	if err != nil {
+		return nil, err
+	}
+
+	gcm, err := cipher.NewGCM(block)
+	if err != nil {
+		return nil, err
+	}
+
+	nonce := make([]byte, gcm.NonceSize())
+	if _, err := rand.Read(nonce); err != nil {
+		return nil, err
+	}
+
+	ciphertext := gcm.Seal(nonce, nonce, plaintext, nil)
+	return []byte(base64.URLEncoding.EncodeToString(ciphertext)), nil
+}
+
+// decrypt decrypts data using AES-GCM.
+func decrypt(ciphertext, key []byte) ([]byte, error) {
+	data, err := base64.URLEncoding.DecodeString(string(ciphertext))
+	if err != nil {
+		return nil, err
+	}
+
+	block, err := aes.NewCipher(key)
+	if err != nil {
+		return nil, err
+	}
+
+	gcm, err := cipher.NewGCM(block)
+	if err != nil {
+		return nil, err
+	}
+
+	nonceSize := gcm.NonceSize()
+	if len(data) < nonceSize {
+		return nil, ErrInvalidSession
+	}
+
+	nonce, cipherData := data[:nonceSize], data[nonceSize:]
+	plaintext, err := gcm.Open(nil, nonce, cipherData, nil)
+	if err != nil {
+		return nil, ErrInvalidSession
+	}
+
+	return plaintext, nil
 }
 
 // generateID generates a random session ID.

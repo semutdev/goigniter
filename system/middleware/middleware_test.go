@@ -52,11 +52,17 @@ func TestRecovery(t *testing.T) {
 }
 
 func TestCORS(t *testing.T) {
+	// Default CORS now has empty origins, so we test with explicit config
+	config := CORSConfig{
+		AllowOrigins: []string{"*"},
+		AllowMethods: []string{"GET", "POST", "OPTIONS"},
+	}
+
 	handler := func(c *core.Context) error {
 		return c.String(200, "OK")
 	}
 
-	middleware := CORS()
+	middleware := CORSWithConfig(config)
 	wrapped := middleware(handler)
 
 	// Test preflight request

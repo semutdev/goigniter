@@ -32,6 +32,9 @@ func DefaultRateLimitConfig() RateLimitConfig {
 func RateLimit(max int, window time.Duration) core.Middleware {
 	config := DefaultRateLimitConfig()
 	config.Max = max
+	if window == 0 {
+		window = time.Minute // Default to 1 minute if not specified
+	}
 	config.Window = window
 	return RateLimitWithConfig(config)
 }
@@ -74,6 +77,9 @@ type rateLimitEntry struct {
 }
 
 func newRateLimitStore(window time.Duration) *rateLimitStore {
+	if window == 0 {
+		window = time.Minute // Default to 1 minute
+	}
 	store := &rateLimitStore{
 		entries: make(map[string]*rateLimitEntry),
 		window:  window,
@@ -97,8 +103,13 @@ func (s *rateLimitStore) Allow(key string, max int) bool {
 		return true
 	}
 
+	// Check limit BEFORE incrementing (fixes race condition)
+	if entry.count >= max {
+		return false
+	}
+
 	entry.count++
-	return entry.count <= max
+	return true
 }
 
 func (s *rateLimitStore) cleanup() {

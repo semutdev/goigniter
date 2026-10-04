@@ -20,12 +20,19 @@ type RecoveryConfig struct {
 	DisableStackAll   bool
 	DisablePrintStack bool
 	LogFunc           func(c *core.Context, err any, stack []byte)
+	// HideErrorDetails hides error details in production (recommended)
+	HideErrorDetails bool
+	// ProductionMessage is the message shown when HideErrorDetails is true
+	ProductionMessage string
 }
 
 // RecoveryWithConfig returns a Recovery middleware with custom config.
 func RecoveryWithConfig(config RecoveryConfig) core.Middleware {
 	if config.StackSize == 0 {
 		config.StackSize = 4 << 10
+	}
+	if config.ProductionMessage == "" {
+		config.ProductionMessage = "Internal Server Error"
 	}
 
 	return func(next core.HandlerFunc) core.HandlerFunc {
@@ -42,8 +49,13 @@ func RecoveryWithConfig(config RecoveryConfig) core.Middleware {
 						log.Printf("[PANIC RECOVER] %v\n%s", r, stack)
 					}
 
-					c.String(http.StatusInternalServerError,
-						fmt.Sprintf("Internal Server Error: %v", r))
+					// Hide error details in production
+					if config.HideErrorDetails {
+						c.String(http.StatusInternalServerError, config.ProductionMessage)
+					} else {
+						c.String(http.StatusInternalServerError,
+							fmt.Sprintf("Internal Server Error: %v", r))
+					}
 				}
 			}()
 
