@@ -14,12 +14,13 @@ import (
 
 // ColumnSchema represents metadata for a table column.
 type ColumnSchema struct {
-	Name      string `json:"name"`
-	GoName    string `json:"go_name"`
-	SQLType   string `json:"sql_type"`
-	GoType    string `json:"go_type"`
-	Nullable  bool   `json:"nullable"`
-	IsPrimary bool   `json:"is_primary"`
+	Name            string `json:"name"`
+	GoName          string `json:"go_name"`
+	SQLType         string `json:"sql_type"`
+	GoType          string `json:"go_type"`
+	Nullable        bool   `json:"nullable"`
+	IsPrimary       bool   `json:"is_primary"`
+	IsAutoIncrement bool   `json:"is_auto_increment"`
 }
 
 // TableSchema represents metadata for a database table.
@@ -99,23 +100,37 @@ func TableNameToStructName(table string) string {
 func Singularize(word string) string {
 	lower := strings.ToLower(word)
 	irregulars := map[string]string{
-		"people":   "person",
-		"children": "child",
-		"men":      "man",
-		"women":    "woman",
-		"data":     "datum",
-		"criteria": "criterion",
+		"people":      "person",
+		"children":    "child",
+		"men":         "man",
+		"women":       "woman",
+		"data":        "datum",
+		"criteria":    "criterion",
+		"statuses":    "status",
+		"buses":       "bus",
+		"crises":      "crisis",
+		"bases":       "base",
+		"analyses":    "analysis",
+		"theses":      "thesis",
+		"diagnoses":   "diagnosis",
+		"hypotheses":  "hypothesis",
+		"parentheses": "parenthesis",
+		"synopses":    "synopsis",
+		"gases":       "gas",
+		"bonuses":     "bonus",
+		"campuses":    "campus",
+		"viruses":     "virus",
 	}
 	if sing, ok := irregulars[lower]; ok {
+		if len(word) > 0 && unicode.IsUpper(rune(word[0])) {
+			return strings.ToUpper(sing[:1]) + sing[1:]
+		}
 		return sing
 	}
 	if strings.HasSuffix(lower, "ies") && len(lower) > 3 {
 		return word[:len(word)-3] + "y"
 	}
 	if strings.HasSuffix(lower, "sses") {
-		return word[:len(word)-2]
-	}
-	if strings.HasSuffix(lower, "ses") {
 		return word[:len(word)-2]
 	}
 	if strings.HasSuffix(lower, "xes") || strings.HasSuffix(lower, "ches") || strings.HasSuffix(lower, "shes") || strings.HasSuffix(lower, "zes") {
@@ -241,52 +256,103 @@ func stripSQLComments(sql string) string {
 
 	for i < n {
 		r := runes[i]
-		if r == '\'' && !inDoubleQuote && !inBacktick {
-			inSingleQuote = !inSingleQuote
+
+		if inSingleQuote {
+			sb.WriteRune(r)
+			if r == '\\' && i+1 < n {
+				i++
+				sb.WriteRune(runes[i])
+			} else if r == '\'' {
+				if i+1 < n && runes[i+1] == '\'' {
+					i++
+					sb.WriteRune(runes[i])
+				} else {
+					inSingleQuote = false
+				}
+			}
+			i++
+			continue
+		}
+
+		if inDoubleQuote {
+			sb.WriteRune(r)
+			if r == '\\' && i+1 < n {
+				i++
+				sb.WriteRune(runes[i])
+			} else if r == '"' {
+				if i+1 < n && runes[i+1] == '"' {
+					i++
+					sb.WriteRune(runes[i])
+				} else {
+					inDoubleQuote = false
+				}
+			}
+			i++
+			continue
+		}
+
+		if inBacktick {
+			sb.WriteRune(r)
+			if r == '\\' && i+1 < n {
+				i++
+				sb.WriteRune(runes[i])
+			} else if r == '`' {
+				if i+1 < n && runes[i+1] == '`' {
+					i++
+					sb.WriteRune(runes[i])
+				} else {
+					inBacktick = false
+				}
+			}
+			i++
+			continue
+		}
+
+		// Outside any quote
+		if r == '\'' {
+			inSingleQuote = true
 			sb.WriteRune(r)
 			i++
 			continue
 		}
-		if r == '"' && !inSingleQuote && !inBacktick {
-			inDoubleQuote = !inDoubleQuote
+		if r == '"' {
+			inDoubleQuote = true
 			sb.WriteRune(r)
 			i++
 			continue
 		}
-		if r == '`' && !inSingleQuote && !inDoubleQuote {
-			inBacktick = !inBacktick
+		if r == '`' {
+			inBacktick = true
 			sb.WriteRune(r)
 			i++
 			continue
 		}
 
-		if !inSingleQuote && !inDoubleQuote && !inBacktick {
-			if r == '-' && i+1 < n && runes[i+1] == '-' {
-				i += 2
-				for i < n && runes[i] != '\n' {
-					i++
-				}
-				continue
-			}
-			if r == '#' {
+		if r == '-' && i+1 < n && runes[i+1] == '-' {
+			i += 2
+			for i < n && runes[i] != '\n' {
 				i++
-				for i < n && runes[i] != '\n' {
-					i++
-				}
-				continue
 			}
-			if r == '/' && i+1 < n && runes[i+1] == '*' {
+			continue
+		}
+		if r == '#' {
+			i++
+			for i < n && runes[i] != '\n' {
+				i++
+			}
+			continue
+		}
+		if r == '/' && i+1 < n && runes[i+1] == '*' {
+			i += 2
+			for i+1 < n && !(runes[i] == '*' && runes[i+1] == '/') {
+				i++
+			}
+			if i+1 < n {
 				i += 2
-				for i+1 < n && !(runes[i] == '*' && runes[i+1] == '/') {
-					i++
-				}
-				if i+1 < n {
-					i += 2
-				} else {
-					i = n
-				}
-				continue
+			} else {
+				i = n
 			}
+			continue
 		}
 
 		sb.WriteRune(r)
@@ -304,38 +370,88 @@ func splitByTopLevelCommas(s string) []string {
 	inBacktick := false
 
 	runes := []rune(s)
-	for i := 0; i < len(runes); i++ {
+	n := len(runes)
+	for i := 0; i < n; i++ {
 		r := runes[i]
-		if r == '\'' && !inDoubleQuote && !inBacktick {
-			inSingleQuote = !inSingleQuote
+
+		if inSingleQuote {
+			current.WriteRune(r)
+			if r == '\\' && i+1 < n {
+				i++
+				current.WriteRune(runes[i])
+			} else if r == '\'' {
+				if i+1 < n && runes[i+1] == '\'' {
+					i++
+					current.WriteRune(runes[i])
+				} else {
+					inSingleQuote = false
+				}
+			}
+			continue
+		}
+
+		if inDoubleQuote {
+			current.WriteRune(r)
+			if r == '\\' && i+1 < n {
+				i++
+				current.WriteRune(runes[i])
+			} else if r == '"' {
+				if i+1 < n && runes[i+1] == '"' {
+					i++
+					current.WriteRune(runes[i])
+				} else {
+					inDoubleQuote = false
+				}
+			}
+			continue
+		}
+
+		if inBacktick {
+			current.WriteRune(r)
+			if r == '\\' && i+1 < n {
+				i++
+				current.WriteRune(runes[i])
+			} else if r == '`' {
+				if i+1 < n && runes[i+1] == '`' {
+					i++
+					current.WriteRune(runes[i])
+				} else {
+					inBacktick = false
+				}
+			}
+			continue
+		}
+
+		// Not in any quote
+		if r == '\'' {
+			inSingleQuote = true
 			current.WriteRune(r)
 			continue
 		}
-		if r == '"' && !inSingleQuote && !inBacktick {
-			inDoubleQuote = !inDoubleQuote
+		if r == '"' {
+			inDoubleQuote = true
 			current.WriteRune(r)
 			continue
 		}
-		if r == '`' && !inSingleQuote && !inDoubleQuote {
-			inBacktick = !inBacktick
+		if r == '`' {
+			inBacktick = true
 			current.WriteRune(r)
 			continue
 		}
 
-		if !inSingleQuote && !inDoubleQuote && !inBacktick {
-			if r == '(' {
-				depth++
-			} else if r == ')' {
-				depth--
-			} else if r == ',' && depth == 0 {
-				trimmed := strings.TrimSpace(current.String())
-				if trimmed != "" {
-					parts = append(parts, trimmed)
-				}
-				current.Reset()
-				continue
+		if r == '(' {
+			depth++
+		} else if r == ')' {
+			depth--
+		} else if r == ',' && depth == 0 {
+			trimmed := strings.TrimSpace(current.String())
+			if trimmed != "" {
+				parts = append(parts, trimmed)
 			}
+			current.Reset()
+			continue
 		}
+
 		current.WriteRune(r)
 	}
 	trimmed := strings.TrimSpace(current.String())
@@ -354,9 +470,28 @@ func extractSQLType(s string) (sqlType string, remainder string) {
 	hasParen := false
 	typeEnd := -1
 	runes := []rune(s)
+	n := len(runes)
+	inSingleQuote := false
 
-	for i := 0; i < len(runes); i++ {
+	for i := 0; i < n; i++ {
 		r := runes[i]
+		if inSingleQuote {
+			if r == '\\' && i+1 < n {
+				i++
+			} else if r == '\'' {
+				if i+1 < n && runes[i+1] == '\'' {
+					i++
+				} else {
+					inSingleQuote = false
+				}
+			}
+			continue
+		}
+		if r == '\'' {
+			inSingleQuote = true
+			continue
+		}
+
 		if r == '(' {
 			depth++
 			hasParen = true
@@ -383,7 +518,7 @@ func extractSQLType(s string) (sqlType string, remainder string) {
 var (
 	createTableRegex = regexp.MustCompile(`(?i)\bCREATE\s+(?:TEMPORARY\s+)?TABLE\s+(?:IF\s+NOT\s+EXISTS\s+)?([^\s(]+)`)
 	primaryKeyRegex  = regexp.MustCompile(`(?i)^\s*(?:CONSTRAINT\s+\S+\s+)?PRIMARY\s+KEY\s*\((.*?)\)`)
-	constraintRegex  = regexp.MustCompile(`(?i)^\s*(?:CONSTRAINT\s+\S+\s+)?(?:FOREIGN\s+KEY|UNIQUE\s+KEY|UNIQUE|KEY|INDEX|CHECK)\b`)
+	constraintRegex  = regexp.MustCompile(`(?i)^\s*(?:CONSTRAINT\s+\S+\s+)?(?:FOREIGN\s+KEY|UNIQUE\s+KEY|UNIQUE|FULLTEXT\s+(?:KEY|INDEX)|FULLTEXT|SPATIAL\s+(?:KEY|INDEX)|SPATIAL|KEY|INDEX|CHECK)\b`)
 	nullKeywordRegex = regexp.MustCompile(`\bNULL\b`)
 )
 
@@ -418,30 +553,69 @@ func ParseSQLSchema(sqlContent string) ([]TableSchema, error) {
 		inBacktick := false
 		bodyEnd := -1
 
-		for idx := 0; idx < len(bodyRunes); idx++ {
+		nBody := len(bodyRunes)
+		for idx := 0; idx < nBody; idx++ {
 			r := bodyRunes[idx]
-			if r == '\'' && !inDoubleQuote && !inBacktick {
-				inSingleQuote = !inSingleQuote
-				continue
-			}
-			if r == '"' && !inSingleQuote && !inBacktick {
-				inDoubleQuote = !inDoubleQuote
-				continue
-			}
-			if r == '`' && !inSingleQuote && !inDoubleQuote {
-				inBacktick = !inBacktick
+
+			if inSingleQuote {
+				if r == '\\' && idx+1 < nBody {
+					idx++
+				} else if r == '\'' {
+					if idx+1 < nBody && bodyRunes[idx+1] == '\'' {
+						idx++
+					} else {
+						inSingleQuote = false
+					}
+				}
 				continue
 			}
 
-			if !inSingleQuote && !inDoubleQuote && !inBacktick {
-				if r == '(' {
-					depth++
-				} else if r == ')' {
-					depth--
-					if depth == 0 {
-						bodyEnd = idx
-						break
+			if inDoubleQuote {
+				if r == '\\' && idx+1 < nBody {
+					idx++
+				} else if r == '"' {
+					if idx+1 < nBody && bodyRunes[idx+1] == '"' {
+						idx++
+					} else {
+						inDoubleQuote = false
 					}
+				}
+				continue
+			}
+
+			if inBacktick {
+				if r == '\\' && idx+1 < nBody {
+					idx++
+				} else if r == '`' {
+					if idx+1 < nBody && bodyRunes[idx+1] == '`' {
+						idx++
+					} else {
+						inBacktick = false
+					}
+				}
+				continue
+			}
+
+			if r == '\'' {
+				inSingleQuote = true
+				continue
+			}
+			if r == '"' {
+				inDoubleQuote = true
+				continue
+			}
+			if r == '`' {
+				inBacktick = true
+				continue
+			}
+
+			if r == '(' {
+				depth++
+			} else if r == ')' {
+				depth--
+				if depth == 0 {
+					bodyEnd = idx
+					break
 				}
 			}
 		}
@@ -514,7 +688,12 @@ func ParseSQLSchema(sqlContent string) ([]TableSchema, error) {
 			}
 
 			upperRemainder := strings.ToUpper(remainder)
+			upperSQLType := strings.ToUpper(sqlType)
 			isPrimary := strings.Contains(upperRemainder, "PRIMARY KEY")
+			isAutoIncrement := strings.Contains(upperRemainder, "AUTO_INCREMENT") ||
+				strings.Contains(upperRemainder, "AUTOINCREMENT") ||
+				strings.Contains(upperRemainder, "SERIAL") ||
+				strings.Contains(upperSQLType, "SERIAL")
 			nullable := false
 
 			if strings.Contains(upperRemainder, "NOT NULL") {
@@ -532,12 +711,13 @@ func ParseSQLSchema(sqlContent string) ([]TableSchema, error) {
 			goType, _ := sqlTypeToGoType(sqlType, nullable)
 
 			col := ColumnSchema{
-				Name:      colName,
-				GoName:    ColumnNameToFieldName(colName),
-				SQLType:   sqlType,
-				GoType:    goType,
-				Nullable:  nullable,
-				IsPrimary: isPrimary,
+				Name:            colName,
+				GoName:          ColumnNameToFieldName(colName),
+				SQLType:         sqlType,
+				GoType:          goType,
+				Nullable:        nullable,
+				IsPrimary:       isPrimary,
+				IsAutoIncrement: isAutoIncrement,
 			}
 
 			if isPrimary {
@@ -589,8 +769,9 @@ func ParseSQLSchema(sqlContent string) ([]TableSchema, error) {
 	return tables, nil
 }
 
-// GenerateModelGoCode generates idiomatic Go model code with CRUD boilerplate for GoIgniter.
-func GenerateModelGoCode(schema TableSchema, pkgName string) (string, error) {
+// GenerateMultiModelGoCode generates a single valid Go file containing models and CRUD boilerplate
+// for multiple table schemas.
+func GenerateMultiModelGoCode(schemas []TableSchema, pkgName string) (string, error) {
 	if pkgName == "" {
 		pkgName = "models"
 	}
@@ -600,11 +781,16 @@ func GenerateModelGoCode(schema TableSchema, pkgName string) (string, error) {
 	// Package
 	sb.WriteString(fmt.Sprintf("package %s\n\n", pkgName))
 
-	// Imports
+	// Combined imports
 	needTime := false
-	for _, col := range schema.Columns {
-		if strings.Contains(col.GoType, "time.Time") {
-			needTime = true
+	for _, schema := range schemas {
+		for _, col := range schema.Columns {
+			if strings.Contains(col.GoType, "time.Time") {
+				needTime = true
+				break
+			}
+		}
+		if needTime {
 			break
 		}
 	}
@@ -616,6 +802,27 @@ func GenerateModelGoCode(schema TableSchema, pkgName string) (string, error) {
 	sb.WriteString("\t\"github.com/semutdev/goigniter/system/libraries/database\"\n")
 	sb.WriteString(")\n\n")
 
+	for i, schema := range schemas {
+		if i > 0 {
+			sb.WriteString("\n")
+		}
+		appendSchemaCode(&sb, schema)
+	}
+
+	formatted, err := format.Source([]byte(sb.String()))
+	if err != nil {
+		return sb.String(), fmt.Errorf("formatting generated Go code: %w", err)
+	}
+
+	return string(formatted), nil
+}
+
+// GenerateModelGoCode generates idiomatic Go model code with CRUD boilerplate for GoIgniter.
+func GenerateModelGoCode(schema TableSchema, pkgName string) (string, error) {
+	return GenerateMultiModelGoCode([]TableSchema{schema}, pkgName)
+}
+
+func appendSchemaCode(sb *strings.Builder, schema TableSchema) {
 	// Struct
 	sb.WriteString(fmt.Sprintf("// %s represents the %s table.\n", schema.StructName, schema.TableName))
 	sb.WriteString(fmt.Sprintf("type %s struct {\n", schema.StructName))
@@ -642,10 +849,13 @@ func GenerateModelGoCode(schema TableSchema, pkgName string) (string, error) {
 	sb.WriteString("}\n\n")
 
 	// Primary key info
-	pkCol := "id"
-	pkGoName := "ID"
+	pkCol := ""
+	pkGoName := ""
 	pkType := "int"
-	if len(schema.PrimaryKeys) > 0 {
+	hasPK := len(schema.PrimaryKeys) > 0
+	hasIDCol := false
+
+	if hasPK {
 		pkCol = schema.PrimaryKeys[0]
 		for _, col := range schema.Columns {
 			if strings.EqualFold(col.Name, pkCol) {
@@ -654,16 +864,45 @@ func GenerateModelGoCode(schema TableSchema, pkgName string) (string, error) {
 				break
 			}
 		}
+	} else {
+		for _, col := range schema.Columns {
+			if strings.EqualFold(col.Name, "id") {
+				hasIDCol = true
+				pkCol = col.Name
+				pkGoName = col.GoName
+				pkType = strings.TrimPrefix(col.GoType, "*")
+				break
+			}
+		}
 	}
+
+	hasKey := hasPK || hasIDCol
+	if !hasKey && len(schema.Columns) > 0 {
+		// Table has no primary key and no column named id. Use the first column as identifier.
+		firstCol := schema.Columns[0]
+		pkCol = firstCol.Name
+		pkGoName = firstCol.GoName
+		pkType = strings.TrimPrefix(firstCol.GoType, "*")
+	}
+
 	pkParam := "id"
-	if !strings.EqualFold(pkCol, "id") {
+	if pkGoName != "" && !strings.EqualFold(pkCol, "id") {
 		pkParam = lowerFirst(pkGoName)
 	}
 
 	entityVar := lowerFirst(schema.StructName)
 
+	if len(schema.Columns) == 0 {
+		sb.WriteString(fmt.Sprintf("// Note: %s table has no columns defined.\n\n", schema.TableName))
+		return
+	}
+
 	// Find(id <pkType>) (*<StructName>, error)
-	sb.WriteString(fmt.Sprintf("// Find retrieves a single %s by primary key.\n", schema.StructName))
+	if !hasKey {
+		sb.WriteString(fmt.Sprintf("// Find retrieves a single %s by %s (table lacks primary key).\n", schema.StructName, pkCol))
+	} else {
+		sb.WriteString(fmt.Sprintf("// Find retrieves a single %s by primary key.\n", schema.StructName))
+	}
 	sb.WriteString(fmt.Sprintf("func (m *%s) Find(%s %s) (*%s, error) {\n", modelName, pkParam, pkType, schema.StructName))
 	sb.WriteString(fmt.Sprintf("\tvar item %s\n", schema.StructName))
 	sb.WriteString(fmt.Sprintf("\terr := database.Table(\"%s\").Where(\"%s\", %s).First(&item)\n", schema.TableName, pkCol, pkParam))
@@ -682,9 +921,10 @@ func GenerateModelGoCode(schema TableSchema, pkgName string) (string, error) {
 	sb.WriteString("}\n\n")
 
 	// Insert(<entityVar> *<StructName>) error
+	// Only omit primary key column if col.IsAutoIncrement
 	var insertCols []ColumnSchema
 	for _, col := range schema.Columns {
-		if len(schema.PrimaryKeys) == 1 && col.IsPrimary && len(schema.Columns) > 1 {
+		if col.IsPrimary && col.IsAutoIncrement && len(schema.Columns) > 1 {
 			continue
 		}
 		insertCols = append(insertCols, col)
@@ -702,13 +942,23 @@ func GenerateModelGoCode(schema TableSchema, pkgName string) (string, error) {
 	// Update(<entityVar> *<StructName>) error
 	var updateCols []ColumnSchema
 	for _, col := range schema.Columns {
-		if col.IsPrimary && len(schema.Columns) > len(schema.PrimaryKeys) {
-			continue
+		if hasPK {
+			if col.IsPrimary && len(schema.Columns) > len(schema.PrimaryKeys) {
+				continue
+			}
+		} else {
+			if strings.EqualFold(col.Name, pkCol) && len(schema.Columns) > 1 {
+				continue
+			}
 		}
 		updateCols = append(updateCols, col)
 	}
 
-	sb.WriteString(fmt.Sprintf("// Update updates an existing %s record in the database.\n", schema.StructName))
+	if !hasKey {
+		sb.WriteString(fmt.Sprintf("// Update updates an existing %s record in the database by %s (table lacks primary key).\n", schema.StructName, pkCol))
+	} else {
+		sb.WriteString(fmt.Sprintf("// Update updates an existing %s record in the database.\n", schema.StructName))
+	}
 	sb.WriteString(fmt.Sprintf("func (m *%s) Update(%s *%s) error {\n", modelName, entityVar, schema.StructName))
 	whereChain := fmt.Sprintf(".Where(\"%s\", %s.%s)", pkCol, entityVar, pkGoName)
 	if len(schema.PrimaryKeys) > 1 {
@@ -728,17 +978,14 @@ func GenerateModelGoCode(schema TableSchema, pkgName string) (string, error) {
 	sb.WriteString("}\n\n")
 
 	// Delete(<pkParam> <pkType>) error
-	sb.WriteString(fmt.Sprintf("// Delete deletes a %s record by primary key.\n", schema.StructName))
+	if !hasKey {
+		sb.WriteString(fmt.Sprintf("// Delete deletes a %s record by %s (table lacks primary key).\n", schema.StructName, pkCol))
+	} else {
+		sb.WriteString(fmt.Sprintf("// Delete deletes a %s record by primary key.\n", schema.StructName))
+	}
 	sb.WriteString(fmt.Sprintf("func (m *%s) Delete(%s %s) error {\n", modelName, pkParam, pkType))
 	sb.WriteString(fmt.Sprintf("\treturn database.Table(\"%s\").Where(\"%s\", %s).Delete()\n", schema.TableName, pkCol, pkParam))
 	sb.WriteString("}\n")
-
-	formatted, err := format.Source([]byte(sb.String()))
-	if err != nil {
-		return sb.String(), fmt.Errorf("formatting generated Go code: %w", err)
-	}
-
-	return string(formatted), nil
 }
 
 // RunSQL2StructCLI executes the sql2struct command line tool with given arguments.
@@ -782,39 +1029,29 @@ func RunSQL2StructCLI(args []string) error {
 		return fmt.Errorf("no CREATE TABLE statements found in %s", *sqlPath)
 	}
 
-	// If -out is empty or "-", print to stdout
+	// If -out is empty or "-", print to stdout as combined Go code
 	if *outDir == "" || *outDir == "-" {
-		for i, table := range tables {
-			code, err := GenerateModelGoCode(table, *pkgName)
-			if err != nil {
-				return fmt.Errorf("generating code for %s: %w", table.TableName, err)
-			}
-			if i > 0 {
-				fmt.Println("\n// " + strings.Repeat("-", 60) + "\n")
-			}
-			fmt.Print(code)
+		code, err := GenerateMultiModelGoCode(tables, *pkgName)
+		if err != nil {
+			return fmt.Errorf("generating code: %w", err)
 		}
+		fmt.Print(code)
 		return nil
 	}
 
 	// If -out ends with .go, write single/combined file
 	if strings.HasSuffix(strings.ToLower(*outDir), ".go") {
 		dir := filepath.Dir(*outDir)
-		if err := os.MkdirAll(dir, 0755); err != nil {
-			return fmt.Errorf("creating directory %s: %w", dir, err)
-		}
-		var fullCode strings.Builder
-		for i, table := range tables {
-			code, err := GenerateModelGoCode(table, *pkgName)
-			if err != nil {
-				return fmt.Errorf("generating code for %s: %w", table.TableName, err)
+		if dir != "" && dir != "." {
+			if err := os.MkdirAll(dir, 0755); err != nil {
+				return fmt.Errorf("creating directory %s: %w", dir, err)
 			}
-			if i > 0 {
-				fullCode.WriteString("\n\n")
-			}
-			fullCode.WriteString(code)
 		}
-		if err := os.WriteFile(*outDir, []byte(fullCode.String()), 0644); err != nil {
+		code, err := GenerateMultiModelGoCode(tables, *pkgName)
+		if err != nil {
+			return fmt.Errorf("generating code: %w", err)
+		}
+		if err := os.WriteFile(*outDir, []byte(code), 0644); err != nil {
 			return fmt.Errorf("writing output file %s: %w", *outDir, err)
 		}
 		fmt.Printf("Model generated: %s\n", *outDir)

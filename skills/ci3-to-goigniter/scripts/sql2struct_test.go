@@ -5,6 +5,7 @@ import (
 	"go/token"
 	"os"
 	"path/filepath"
+	"regexp"
 	"strings"
 	"testing"
 )
@@ -45,21 +46,22 @@ CREATE TABLE IF NOT EXISTS ` + "`users`" + ` (
 	}
 
 	expectedCols := []struct {
-		name      string
-		goName    string
-		sqlType   string
-		goType    string
-		nullable  bool
-		isPrimary bool
+		name            string
+		goName          string
+		sqlType         string
+		goType          string
+		nullable        bool
+		isPrimary       bool
+		isAutoIncrement bool
 	}{
-		{"id", "ID", "INT", "int", false, true},
-		{"username", "Username", "VARCHAR(50)", "string", false, false},
-		{"email", "Email", "VARCHAR(100)", "string", false, false},
-		{"bio", "Bio", "TEXT", "*string", true, false},
-		{"is_active", "IsActive", "TINYINT(1)", "bool", false, false},
-		{"balance", "Balance", "DECIMAL(10,2)", "float64", false, false},
-		{"created_at", "CreatedAt", "DATETIME", "time.Time", false, false},
-		{"updated_at", "UpdatedAt", "TIMESTAMP", "*time.Time", true, false},
+		{"id", "ID", "INT", "int", false, true, true},
+		{"username", "Username", "VARCHAR(50)", "string", false, false, false},
+		{"email", "Email", "VARCHAR(100)", "string", false, false, false},
+		{"bio", "Bio", "TEXT", "*string", true, false, false},
+		{"is_active", "IsActive", "TINYINT(1)", "bool", false, false, false},
+		{"balance", "Balance", "DECIMAL(10,2)", "float64", false, false, false},
+		{"created_at", "CreatedAt", "DATETIME", "time.Time", false, false, false},
+		{"updated_at", "UpdatedAt", "TIMESTAMP", "*time.Time", true, false, false},
 	}
 
 	if len(table.Columns) != len(expectedCols) {
@@ -85,6 +87,9 @@ CREATE TABLE IF NOT EXISTS ` + "`users`" + ` (
 		}
 		if col.IsPrimary != exp.isPrimary {
 			t.Errorf("col[%d] isPrimary: expected %v, got %v", i, exp.isPrimary, col.IsPrimary)
+		}
+		if col.IsAutoIncrement != exp.isAutoIncrement {
+			t.Errorf("col[%d] isAutoIncrement: expected %v, got %v", i, exp.isAutoIncrement, col.IsAutoIncrement)
 		}
 	}
 }
@@ -236,12 +241,47 @@ func TestSQL2Struct_SingularizeAndCamelCase(t *testing.T) {
 		{"posts", "Post"},
 		{"people", "Person"},
 		{"user", "User"},
+		{"courses", "Course"},
+		{"expenses", "Expense"},
+		{"licenses", "License"},
+		{"databases", "Database"},
+		{"responses", "Response"},
+		{"cases", "Case"},
+		{"purchases", "Purchase"},
+		{"buses", "Bus"},
+		{"crises", "Crisis"},
+		{"bases", "Base"},
 	}
 
 	for _, tc := range testCases {
 		got := TableNameToStructName(tc.table)
 		if got != tc.expected {
 			t.Errorf("TableNameToStructName(%q): expected %q, got %q", tc.table, tc.expected, got)
+		}
+	}
+
+	singularCases := []struct {
+		word     string
+		expected string
+	}{
+		{"courses", "course"},
+		{"expenses", "expense"},
+		{"licenses", "license"},
+		{"databases", "database"},
+		{"statuses", "status"},
+		{"responses", "response"},
+		{"cases", "case"},
+		{"purchases", "purchase"},
+		{"buses", "bus"},
+		{"crises", "crisis"},
+		{"bases", "base"},
+		{"people", "person"},
+		{"children", "child"},
+	}
+	for _, tc := range singularCases {
+		got := Singularize(tc.word)
+		if got != tc.expected {
+			t.Errorf("Singularize(%q): expected %q, got %q", tc.word, tc.expected, got)
 		}
 	}
 
@@ -309,5 +349,208 @@ CREATE TABLE products (
 	// Test missing -sql flag returns error
 	if err := RunSQL2StructCLI([]string{}); err == nil {
 		t.Errorf("expected error when -sql flag is missing, got nil")
+	}
+}
+
+func TestSQL2Struct_MultiTableCombinedFile(t *testing.T) {
+	tempDir := t.TempDir()
+	sqlFilePath := filepath.Join(tempDir, "multi_schema.sql")
+	sqlContent := `
+CREATE TABLE courses (
+  id INT AUTO_INCREMENT PRIMARY KEY,
+  title VARCHAR(100) NOT NULL,
+  description TEXT NULL,
+  created_at DATETIME NOT NULL
+);
+
+CREATE TABLE expenses (
+  id INT AUTO_INCREMENT PRIMARY KEY,
+  course_id INT NOT NULL,
+  amount DECIMAL(10,2) NOT NULL,
+  created_at DATETIME NOT NULL
+);
+
+CREATE TABLE licenses (
+  id INT AUTO_INCREMENT PRIMARY KEY,
+  license_key VARCHAR(64) NOT NULL UNIQUE
+);
+`
+	if err := os.WriteFile(sqlFilePath, []byte(sqlContent), 0644); err != nil {
+		t.Fatalf("failed to write test SQL file: %v", err)
+	}
+
+	combinedFile := filepath.Join(tempDir, "models.go")
+
+	err := RunSQL2StructCLI([]string{
+		"-sql", sqlFilePath,
+		"-out", combinedFile,
+		"-pkg", "models",
+	})
+	if err != nil {
+		t.Fatalf("RunSQL2StructCLI failed: %v", err)
+	}
+
+	content, err := os.ReadFile(combinedFile)
+	if err != nil {
+		t.Fatalf("failed to read combined file: %v", err)
+	}
+
+	code := string(content)
+
+	// Verify the entire combined file parses as valid Go
+	fset := token.NewFileSet()
+	if _, err := parser.ParseFile(fset, "models.go", code, parser.AllErrors); err != nil {
+		t.Fatalf("Combined generated file is not valid Go: %v\nCode:\n%s", err, code)
+	}
+
+	// Verify only one package statement
+	if strings.Count(code, "package models") != 1 {
+		t.Errorf("expected exactly 1 'package models', found %d", strings.Count(code, "package models"))
+	}
+
+	// Verify only one import block
+	if strings.Count(code, "import (") != 1 {
+		t.Errorf("expected exactly 1 'import (', found %d", strings.Count(code, "import ("))
+	}
+
+	// Verify all structs and models are generated
+	for _, expectedType := range []string{
+		"type Course struct",
+		"type CourseModel struct",
+		"type Expense struct",
+		"type ExpenseModel struct",
+		"type License struct",
+		"type LicenseModel struct",
+	} {
+		if !strings.Contains(code, expectedType) {
+			t.Errorf("expected %s in combined file", expectedType)
+		}
+	}
+}
+
+func TestSQL2Struct_UUIDAndNonAutoIncrementPKInInsert(t *testing.T) {
+	sql := `
+CREATE TABLE sessions (
+  id VARCHAR(36) PRIMARY KEY,
+  user_id INT NOT NULL,
+  token VARCHAR(255) NOT NULL,
+  created_at DATETIME NOT NULL
+);
+`
+	schemas, err := ParseSQLSchema(sql)
+	if err != nil {
+		t.Fatalf("ParseSQLSchema failed: %v", err)
+	}
+	if len(schemas) != 1 {
+		t.Fatalf("expected 1 schema, got %d", len(schemas))
+	}
+
+	table := schemas[0]
+	if table.Columns[0].IsAutoIncrement {
+		t.Errorf("expected id column IsAutoIncrement = false, got true")
+	}
+
+	code, err := GenerateModelGoCode(table, "models")
+	if err != nil {
+		t.Fatalf("GenerateModelGoCode failed: %v", err)
+	}
+
+	// Verify valid Go code
+	fset := token.NewFileSet()
+	if _, err := parser.ParseFile(fset, "session.go", code, parser.AllErrors); err != nil {
+		t.Fatalf("Generated code is not valid Go: %v\nCode:\n%s", err, code)
+	}
+
+	// Since id is a UUID/non-auto-increment PK, it MUST be included in the Insert map!
+	insertRegex := regexp.MustCompile(`"id":\s+session\.ID`)
+	if !insertRegex.MatchString(code) {
+		t.Errorf("expected Insert method to include \"id\": session.ID\nGenerated code:\n%s", code)
+	}
+}
+
+func TestSQL2Struct_TableWithoutPK(t *testing.T) {
+	sql := `
+CREATE TABLE activity_logs (
+  action VARCHAR(50) NOT NULL,
+  details TEXT,
+  created_at DATETIME NOT NULL
+);
+`
+	schemas, err := ParseSQLSchema(sql)
+	if err != nil {
+		t.Fatalf("ParseSQLSchema failed: %v", err)
+	}
+	if len(schemas) != 1 {
+		t.Fatalf("expected 1 schema, got %d", len(schemas))
+	}
+
+	code, err := GenerateModelGoCode(schemas[0], "models")
+	if err != nil {
+		t.Fatalf("GenerateModelGoCode failed: %v", err)
+	}
+
+	// Verify valid Go code
+	fset := token.NewFileSet()
+	if _, err := parser.ParseFile(fset, "activity_log.go", code, parser.AllErrors); err != nil {
+		t.Fatalf("Generated code is not valid Go: %v\nCode:\n%s", err, code)
+	}
+
+	// Must NOT contain undefined activityLog.ID
+	if strings.Contains(code, "activityLog.ID") {
+		t.Errorf("expected no activityLog.ID in generated code for table without PK or id column")
+	}
+
+	// Must contain comment or fallback identifier
+	if !strings.Contains(code, "table lacks primary key") {
+		t.Errorf("expected note about lacking primary key")
+	}
+}
+
+func TestSQL2Struct_FulltextSpatialAndEscapedQuotes(t *testing.T) {
+	sql := `
+CREATE TABLE articles (
+  id INT AUTO_INCREMENT PRIMARY KEY,
+  title VARCHAR(200) NOT NULL DEFAULT 'it\'s a test, with ''doubled quotes'' and commas',
+  body TEXT NOT NULL,
+  location GEOMETRY NULL,
+  FULLTEXT KEY idx_ft_title_body (title, body),
+  SPATIAL KEY idx_loc (location)
+);
+`
+	schemas, err := ParseSQLSchema(sql)
+	if err != nil {
+		t.Fatalf("ParseSQLSchema failed: %v", err)
+	}
+	if len(schemas) != 1 {
+		t.Fatalf("expected 1 schema, got %d", len(schemas))
+	}
+
+	table := schemas[0]
+	// Verify that FULLTEXT and SPATIAL keys were skipped and not parsed as columns
+	if len(table.Columns) != 4 {
+		var colNames []string
+		for _, c := range table.Columns {
+			colNames = append(colNames, c.Name)
+		}
+		t.Fatalf("expected 4 columns, got %d: %v", len(table.Columns), colNames)
+	}
+
+	if !table.Columns[0].IsAutoIncrement {
+		t.Errorf("expected id column IsAutoIncrement = true, got false")
+	}
+
+	code, err := GenerateModelGoCode(table, "models")
+	if err != nil {
+		t.Fatalf("GenerateModelGoCode failed: %v", err)
+	}
+
+	fset := token.NewFileSet()
+	if _, err := parser.ParseFile(fset, "article.go", code, parser.AllErrors); err != nil {
+		t.Fatalf("Generated code is not valid Go: %v\nCode:\n%s", err, code)
+	}
+
+	// id is auto-increment, so it should NOT be in Insert map
+	if strings.Contains(code, `"id": article.ID`) {
+		t.Errorf("auto-increment id should not be in Insert map")
 	}
 }
