@@ -425,12 +425,52 @@ func (vt *viewTranspiler) transpileEchoExpr(expr string) (string, bool) {
 		return vt.transpileEchoExpr(firstArg)
 	}
 
+	// Ternary expression: cond ? trueVal : falseVal
+	if qIdx := strings.Index(expr, "?"); qIdx != -1 {
+		if cIdx := strings.LastIndex(expr, ":"); cIdx > qIdx {
+			cond := strings.TrimSpace(expr[:qIdx])
+			truePart := strings.TrimSpace(expr[qIdx+1 : cIdx])
+			falsePart := strings.TrimSpace(expr[cIdx+1:])
+
+			if condTpl, ok := vt.transpileCondition(cond); ok {
+				tRes, tOk := vt.transpileTernaryBranch(truePart)
+				fRes, fOk := vt.transpileTernaryBranch(falsePart)
+				if tOk && fOk {
+					if fRes == "" {
+						return fmt.Sprintf("{{ if %s }}%s{{ end }}", condTpl, tRes), true
+					}
+					return fmt.Sprintf("{{ if %s }}%s{{ else }}%s{{ end }}", condTpl, tRes, fRes), true
+				}
+			}
+		}
+	}
+
 	// Variable reference
 	if reVarExpr.MatchString(expr) {
 		ref := vt.transpileVariableRef(expr)
-		return fmt.Sprintf("{{ %s }}", ref), true
+		if ref != "" {
+			return fmt.Sprintf("{{ %s }}", ref), true
+		}
 	}
 
+	return "", false
+}
+
+func (vt *viewTranspiler) transpileTernaryBranch(branch string) (string, bool) {
+	branch = strings.TrimSpace(branch)
+	if (strings.HasPrefix(branch, "'") && strings.HasSuffix(branch, "'")) ||
+		(strings.HasPrefix(branch, "\"") && strings.HasSuffix(branch, "\"")) {
+		return branch[1 : len(branch)-1], true
+	}
+	if isVarExpr(branch) {
+		ref := vt.transpileVariableRef(branch)
+		if ref != "" {
+			return fmt.Sprintf("{{ %s }}", ref), true
+		}
+	}
+	if branch == "true" || branch == "false" || branch == "1" || branch == "0" {
+		return branch, true
+	}
 	return "", false
 }
 
@@ -625,6 +665,21 @@ func (vt *viewTranspiler) transpileURLArg(rawArg string) string {
 		return "/"
 	}
 
+	// Ternary in URL: site_url($cond ? 'a' : 'b')
+	if qIdx := strings.Index(rawArg, "?"); qIdx != -1 {
+		if cIdx := strings.LastIndex(rawArg, ":"); cIdx > qIdx {
+			cond := strings.TrimSpace(rawArg[:qIdx])
+			truePart := strings.TrimSpace(rawArg[qIdx+1 : cIdx])
+			falsePart := strings.TrimSpace(rawArg[cIdx+1:])
+
+			if condTpl, ok := vt.transpileCondition(cond); ok {
+				trueURL := vt.transpileURLArg(truePart)
+				falseURL := vt.transpileURLArg(falsePart)
+				return fmt.Sprintf("{{ if %s }}%s{{ else }}%s{{ end }}", condTpl, trueURL, falseURL)
+			}
+		}
+	}
+
 	parts := splitPHPConcat(rawArg)
 	if len(parts) == 0 {
 		return "/"
@@ -642,14 +697,16 @@ func (vt *viewTranspiler) transpileURLArg(rawArg string) string {
 			sb.WriteString(literal)
 		} else if strings.HasPrefix(part, "$") {
 			varRef := vt.transpileVariableRef(part)
-			sb.WriteString(fmt.Sprintf("{{ %s }}", varRef))
+			if varRef != "" {
+				sb.WriteString(fmt.Sprintf("{{ %s }}", varRef))
+			}
 		} else {
 			sb.WriteString(part)
 		}
 	}
 
 	result := sb.String()
-	if !strings.HasPrefix(result, "/") {
+	if !strings.HasPrefix(result, "/") && !strings.HasPrefix(result, "{{") {
 		result = "/" + result
 	}
 	return result
