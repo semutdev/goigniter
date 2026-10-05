@@ -239,9 +239,10 @@ go run ./skills/ci3-to-goigniter view2gotpl -file /path/to/ci3/application/views
 | `<?php if ($user): ?>...<?php endif; ?>` | `{{ if .User }}...{{ end }}` | Conditionals |
 | `<?php if (!empty($items)): ?>` | `{{ if .Items }}...{{ end }}` | `empty()` / `isset()` normalization |
 | `<?php foreach ($users as $u): ?>` | `{{ range .Users }}...{{ end }}` | Loops |
-| `<?= site_url('users/edit/' . $id) ?>` | `{{ site_url (printf "users/edit/%v" .ID) }}` | Helper functions |
-| `<?= base_url('assets/css/app.css') ?>` | `{{ base_url "assets/css/app.css" }}` | Asset URLs |
-| `<?= form_open('login') ?>` | `{{ form_open "login" }}` | Form helpers |
+| `<?php echo base_url(); ?>/assets/css/app.css` | `{{ base_url }}/assets/css/app.css` | Asset URLs with helper |
+| `<?= base_url('assets/css/app.css') ?>` | `{{ base_url }}/assets/css/app.css` | Normalized without double slashes |
+| `<?= site_url('users/edit/' . $id) ?>` | `{{ site_url }}/users/edit/{{ .ID }}` | Concatenation with model variables |
+| `<?= form_open('login') ?>` | `<form action="{{ site_url }}/login" method="POST">` | Form helper with site_url |
 | `<?php $this->load->view('header'); ?>` | `{{ template "header.html" . }}` | Partials / layouts (in templates use `"name.html"`; in controllers `c.View()` omits `.html`) |
 
 #### Step 3.2: Static Assets Migration
@@ -522,9 +523,13 @@ func RegisterRoutes(app *core.Application) {
         api.POST("/auth/login", apiController.Login)
     }
 
-    // 3. Or Auto-Routing (matches CI3 default controller/method convention)
-    core.Register(controllers.NewWelcomeController())
-    core.Register(controllers.NewUserController())
+    // 3. Auto-Routing (GoIgniter's signature feature matching CI3 convention)
+    // Automatically strips "Controller" suffix, supports prefix namespaces,
+    // registers index aliases (/admin/dashboard and /admin/dashboard/index),
+    // and maps Go PascalCase methods to CI3 snake_case routes (FilterSummary -> /admin/dashboard/filter_summary)
+    app.Register(&controllers.WelcomeController{})
+    app.Register(&controllers.UserController{})
+    app.Register(&controllers.DashboardController{}, "admin") // prefix "admin" -> /admin/dashboard
     app.AutoRoute()
 }
 ```

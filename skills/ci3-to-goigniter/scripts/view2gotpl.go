@@ -242,12 +242,12 @@ func (vt *viewTranspiler) transpilePHPBlock(rawCode string, isShortEcho bool) st
 		isMultipart := strings.Contains(trimmed, "form_open_multipart")
 		startIdx := strings.Index(trimmed, "form_open")
 		openParen := strings.Index(trimmed[startIdx:], "(")
-		actionURL := "/"
+		actionURL := "{{ site_url }}"
 		if openParen != -1 {
 			argStr := extractParenContent(trimmed[startIdx+openParen:])
 			firstArg := extractFirstArg(argStr)
 			if firstArg != "" {
-				actionURL = vt.transpileURLArg(firstArg)
+				actionURL = vt.transpileURLHelper("site_url", firstArg)
 			}
 		}
 		if isMultipart {
@@ -411,12 +411,12 @@ func (vt *viewTranspiler) transpileEchoExpr(expr string) (string, bool) {
 
 	// Base URL
 	if m := reBaseURL.FindStringSubmatch(expr); m != nil {
-		return vt.transpileURLArg(m[1]), true
+		return vt.transpileURLHelper("base_url", m[1]), true
 	}
 
 	// Site URL
 	if m := reSiteURL.FindStringSubmatch(expr); m != nil {
-		return vt.transpileURLArg(m[1]), true
+		return vt.transpileURLHelper("site_url", m[1]), true
 	}
 
 	// Escaping functions: htmlspecialchars or htmlentities
@@ -660,9 +660,13 @@ func (vt *viewTranspiler) transpileCondition(cond string) (string, bool) {
 }
 
 func (vt *viewTranspiler) transpileURLArg(rawArg string) string {
+	return vt.transpileURLHelper("site_url", rawArg)
+}
+
+func (vt *viewTranspiler) transpileURLHelper(helperName, rawArg string) string {
 	rawArg = strings.TrimSpace(rawArg)
-	if rawArg == "" || rawArg == "''" || rawArg == "\"\"" || rawArg == "'/'" || rawArg == "\"/\"" {
-		return "/"
+	if rawArg == "" || rawArg == "''" || rawArg == "\"\"" {
+		return fmt.Sprintf("{{ %s }}", helperName)
 	}
 
 	// Ternary in URL: site_url($cond ? 'a' : 'b')
@@ -673,8 +677,8 @@ func (vt *viewTranspiler) transpileURLArg(rawArg string) string {
 			falsePart := strings.TrimSpace(rawArg[cIdx+1:])
 
 			if condTpl, ok := vt.transpileCondition(cond); ok {
-				trueURL := vt.transpileURLArg(truePart)
-				falseURL := vt.transpileURLArg(falsePart)
+				trueURL := vt.transpileURLHelper(helperName, truePart)
+				falseURL := vt.transpileURLHelper(helperName, falsePart)
 				return fmt.Sprintf("{{ if %s }}%s{{ else }}%s{{ end }}", condTpl, trueURL, falseURL)
 			}
 		}
@@ -682,7 +686,7 @@ func (vt *viewTranspiler) transpileURLArg(rawArg string) string {
 
 	parts := splitPHPConcat(rawArg)
 	if len(parts) == 0 {
-		return "/"
+		return fmt.Sprintf("{{ %s }}", helperName)
 	}
 
 	var sb strings.Builder
@@ -705,11 +709,22 @@ func (vt *viewTranspiler) transpileURLArg(rawArg string) string {
 		}
 	}
 
-	result := sb.String()
-	if !strings.HasPrefix(result, "/") && !strings.HasPrefix(result, "{{") {
-		result = "/" + result
+	pathPart := sb.String()
+	pathPart = strings.TrimSpace(pathPart)
+	if pathPart == "" || pathPart == "/" {
+		return fmt.Sprintf("{{ %s }}", helperName)
 	}
-	return result
+
+	if !strings.HasPrefix(pathPart, "/") && !strings.HasPrefix(pathPart, "{{") {
+		pathPart = "/" + pathPart
+	}
+
+	// Collapse any consecutive slashes (e.g. //path -> /path)
+	for strings.HasPrefix(pathPart, "//") {
+		pathPart = pathPart[1:]
+	}
+
+	return fmt.Sprintf("{{ %s }}%s", helperName, pathPart)
 }
 
 func splitPHPConcat(s string) []string {

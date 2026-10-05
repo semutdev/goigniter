@@ -279,57 +279,72 @@ func TestView2GoTpl_CommonCI3Helpers(t *testing.T) {
 		{
 			name:     "base_url with asset path",
 			input:    "<?= base_url('css/main.css') ?>",
-			expected: "/css/main.css",
+			expected: "{{ base_url }}/css/main.css",
 		},
 		{
 			name:     "base_url empty root",
 			input:    "<?= base_url() ?>",
-			expected: "/",
+			expected: "{{ base_url }}",
 		},
 		{
 			name:     "base_url empty string",
 			input:    "<?= base_url('') ?>",
-			expected: "/",
+			expected: "{{ base_url }}",
 		},
 		{
 			name:     "base_url double quotes",
 			input:    "<?= base_url(\"js/app.js\") ?>",
-			expected: "/js/app.js",
+			expected: "{{ base_url }}/js/app.js",
 		},
 		{
 			name:     "php echo base_url",
 			input:    "<?php echo base_url('images/logo.png'); ?>",
-			expected: "/images/logo.png",
+			expected: "{{ base_url }}/images/logo.png",
 		},
 		{
 			name:     "site_url with concatenation and variable",
 			input:    "<?= site_url('users/detail/' . $id) ?>",
-			expected: "/users/detail/{{ .ID }}",
+			expected: "{{ site_url }}/users/detail/{{ .ID }}",
 		},
 		{
 			name:     "site_url static path",
 			input:    "<?= site_url('users') ?>",
-			expected: "/users",
+			expected: "{{ site_url }}/users",
 		},
 		{
 			name:     "site_url empty root",
 			input:    "<?= site_url() ?>",
-			expected: "/",
+			expected: "{{ site_url }}",
+		},
+		{
+			name:     "base_url immediately followed by slash path (no double slash)",
+			input:    "<link rel=\"stylesheet\" href=\"<?php echo base_url(); ?>/assets/css/adminlte.css\" />",
+			expected: "<link rel=\"stylesheet\" href=\"{{ base_url }}/assets/css/adminlte.css\" />",
+		},
+		{
+			name:     "site_url immediately followed by slash path (no double slash)",
+			input:    "<a href=\"<?php echo site_url(); ?>/admin/dashboard\">Dashboard</a>",
+			expected: "<a href=\"{{ site_url }}/admin/dashboard\">Dashboard</a>",
+		},
+		{
+			name:     "base_url img src with following slash",
+			input:    "<img src=\"<?php echo base_url(); ?>/assets/img/user.png\">",
+			expected: "<img src=\"{{ base_url }}/assets/img/user.png\">",
 		},
 		{
 			name:     "form_open single action",
 			input:    "<?php echo form_open('login'); ?>",
-			expected: "<form action=\"/login\" method=\"POST\">",
+			expected: "<form action=\"{{ site_url }}/login\" method=\"POST\">",
 		},
 		{
 			name:     "form_open short echo",
 			input:    "<?= form_open('login') ?>",
-			expected: "<form action=\"/login\" method=\"POST\">",
+			expected: "<form action=\"{{ site_url }}/login\" method=\"POST\">",
 		},
 		{
 			name:     "form_open_multipart",
 			input:    "<?php echo form_open_multipart('users/upload'); ?>",
-			expected: "<form action=\"/users/upload\" method=\"POST\" enctype=\"multipart/form-data\">",
+			expected: "<form action=\"{{ site_url }}/users/upload\" method=\"POST\" enctype=\"multipart/form-data\">",
 		},
 		{
 			name:     "form_close",

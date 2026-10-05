@@ -10,6 +10,8 @@ import (
 	"path/filepath"
 	"strings"
 	"testing"
+
+	"github.com/semutdev/goigniter/system/helpers"
 )
 
 // findFixtureDir locates the ci3_fixture directory regardless of current working directory.
@@ -338,14 +340,15 @@ func TestE2E(t *testing.T) {
 			}
 		}
 
-		// Verify standard html/template.ParseFiles succeeds without error
-		tplIndex, err := template.ParseFiles(indexHTMLPath)
+		// Verify html/template parsing with GoIgniter helper functions
+		funcs := helpers.AllTemplateFuncs()
+		tplIndex, err := template.New(filepath.Base(indexHTMLPath)).Funcs(funcs).ParseFiles(indexHTMLPath)
 		if err != nil {
 			indexContent, _ := os.ReadFile(indexHTMLPath)
 			t.Fatalf("html/template.ParseFiles failed on index.html: %v\nContent:\n%s", err, string(indexContent))
 		}
 
-		tplDetail, err := template.ParseFiles(detailHTMLPath)
+		tplDetail, err := template.New(filepath.Base(detailHTMLPath)).Funcs(funcs).ParseFiles(detailHTMLPath)
 		if err != nil {
 			detailContent, _ := os.ReadFile(detailHTMLPath)
 			t.Fatalf("html/template.ParseFiles failed on detail.html: %v\nContent:\n%s", err, string(detailContent))
@@ -510,7 +513,8 @@ func TestE2E(t *testing.T) {
 			if _, err := os.Stat(tplFile); err != nil {
 				t.Fatalf("expected CLI converted template %s: %v", tplFile, err)
 			}
-			if _, err := template.ParseFiles(tplFile); err != nil {
+			funcs := helpers.AllTemplateFuncs()
+			if _, err := template.New(filepath.Base(tplFile)).Funcs(funcs).ParseFiles(tplFile); err != nil {
 				t.Fatalf("CLI converted template %s failed html/template.ParseFiles: %v", tplFile, err)
 			}
 		}
