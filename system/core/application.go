@@ -159,6 +159,11 @@ func (app *Application) Static(prefix, root string) {
 	app.router.Add(http.MethodGet, pattern, handler)
 }
 
+// Register registers a controller with the global registry.
+func (app *Application) Register(controller ControllerInterface, prefix ...string) {
+	globalRegistry.Register(controller, prefix...)
+}
+
 // AutoRoute registers routes for all controllers in the registry.
 func (app *Application) AutoRoute() {
 	globalRegistry.AutoRoute(app)
@@ -395,6 +400,26 @@ func (e *TemplateNotFoundError) Error() string {
 // DefaultTemplateFuncs returns the default template function map.
 func DefaultTemplateFuncs() template.FuncMap {
 	return template.FuncMap{
+		"base_url": func(path ...string) string {
+			p := ""
+			if len(path) > 0 {
+				p = path[0]
+			}
+			if p != "" && !strings.HasPrefix(p, "/") {
+				p = "/" + p
+			}
+			return p
+		},
+		"site_url": func(path ...string) string {
+			p := ""
+			if len(path) > 0 {
+				p = path[0]
+			}
+			if p != "" && !strings.HasPrefix(p, "/") {
+				p = "/" + p
+			}
+			return p
+		},
 		"safe": func(s string) template.HTML {
 			return template.HTML(s)
 		},

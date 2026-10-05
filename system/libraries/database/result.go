@@ -130,6 +130,28 @@ func scanRow(rows *sql.Rows, dest any) error {
 		return sql.ErrNoRows
 	}
 
+	// Handle slice destination (e.g. var users []User; db.First(&users))
+	if elemType.Kind() == reflect.Slice {
+		sliceElemType := elemType.Elem()
+		isPtr := sliceElemType.Kind() == reflect.Ptr
+		if isPtr {
+			sliceElemType = sliceElemType.Elem()
+		}
+		if sliceElemType.Kind() == reflect.Struct {
+			newElem := reflect.New(sliceElemType)
+			scanDest := makeScanDest(newElem.Elem(), columns)
+			if err := rows.Scan(scanDest...); err != nil {
+				return err
+			}
+			if isPtr {
+				elemValue.Set(reflect.Append(elemValue, newElem))
+			} else {
+				elemValue.Set(reflect.Append(elemValue, newElem.Elem()))
+			}
+			return nil
+		}
+	}
+
 	// Handle primitive types (int, int64, string, float64, bool, etc.)
 	if elemType.Kind() != reflect.Struct {
 		if len(columns) > 0 {

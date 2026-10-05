@@ -3,6 +3,7 @@ package core
 import (
 	"reflect"
 	"strings"
+	"unicode"
 )
 
 type controllerRegistry struct {
@@ -13,12 +14,20 @@ var globalRegistry = &controllerRegistry{
 	controllers: make(map[string]ControllerFactory),
 }
 
+// ResetRegistry clears the global controller registry (useful for testing).
+func ResetRegistry() {
+	globalRegistry.controllers = make(map[string]ControllerFactory)
+}
+
 func (r *controllerRegistry) Register(controller ControllerInterface, prefix ...string) {
 	t := reflect.TypeOf(controller)
 	if t.Kind() == reflect.Ptr {
 		t = t.Elem()
 	}
 	name := strings.ToLower(t.Name())
+	if trimmed := strings.TrimSuffix(name, "controller"); trimmed != "" {
+		name = trimmed
+	}
 
 	path := name
 	if len(prefix) > 0 && prefix[0] != "" {
@@ -54,46 +63,82 @@ func (r *controllerRegistry) registerControllerRoutes(app *Application, basePath
 			continue
 		}
 
-		routePath := resolveRoutePath(basePath, methodName, customRoutes)
+		routePaths := resolveRoutePaths(basePath, methodName, customRoutes)
 		httpMethods := resolveHTTPMethods(methodName, allowedMethods)
 
 		handler := createControllerHandler(factory, methodName, controllerMiddleware, methodMiddleware[methodName])
 
-		// Register route for each HTTP method
-		for _, httpMethod := range httpMethods {
-			app.router.Add(httpMethod, routePath, handler)
+		// Register route for each HTTP method and resolved path
+		for _, routePath := range routePaths {
+			for _, httpMethod := range httpMethods {
+				app.router.Add(httpMethod, routePath, handler)
+			}
 		}
 	}
 }
 
-// resolveRoutePath returns the route path for a method.
-// If a custom route is defined, it uses that; otherwise uses default pattern.
-func resolveRoutePath(basePath, methodName string, customRoutes map[string]string) string {
-	// Check if custom route is defined
+// resolveRoutePaths returns route paths for a controller method.
+// For Index: returns both /{basePath} and /{basePath}/index.
+// For PascalCase methods: returns both /{basePath}/snake_case and /{basePath}/lowercase.
+func resolveRoutePaths(basePath, methodName string, customRoutes map[string]string) []string {
 	if customRoutes != nil {
 		if route, ok := customRoutes[methodName]; ok {
-			// If route starts with /, it's absolute; otherwise relative to basePath
 			if len(route) > 0 && route[0] == '/' {
-				return route
+				return []string{route}
 			}
-			return "/" + basePath + "/" + route
+			return []string{"/" + basePath + "/" + route}
 		}
 	}
 
-	// Default pattern: /{controller}/{method}
+	lower := strings.ToLower(methodName)
+	if lower == "index" {
+		return []string{
+			"/" + basePath,
+			"/" + basePath + "/index",
+		}
+	}
+
+	paths := []string{"/" + basePath + "/" + lower}
+	snake := toSnakeCase(methodName)
+	if snake != lower {
+		paths = append([]string{"/" + basePath + "/" + snake}, paths...)
+	}
+
+	return paths
+}
+
+func toSnakeCase(s string) string {
+	var sb strings.Builder
+	for i, r := range s {
+		if unicode.IsUpper(r) {
+			if i > 0 {
+				sb.WriteByte('_')
+			}
+			sb.WriteRune(unicode.ToLower(r))
+		} else {
+			sb.WriteRune(r)
+		}
+	}
+	return sb.String()
+}
+
+// resolveRoutePath returns the primary route path for a method (backwards compatibility).
+func resolveRoutePath(basePath, methodName string, customRoutes map[string]string) string {
+	paths := resolveRoutePaths(basePath, methodName, customRoutes)
+	if len(paths) > 0 {
+		return paths[0]
+	}
 	return "/" + basePath + "/" + strings.ToLower(methodName)
 }
 
 // resolveHTTPMethods returns allowed HTTP methods for a controller method
 func resolveHTTPMethods(methodName string, allowedMethods map[string][]string) []string {
-	// Check if explicitly defined in controller
 	if allowedMethods != nil {
 		if methods, ok := allowedMethods[methodName]; ok {
 			return methods
 		}
 	}
 
-	// Default: all methods allow GET and POST
 	return []string{"GET", "POST"}
 }
 
@@ -107,6 +152,7 @@ func isInternalMethod(name string) bool {
 		"Middleware":     true,
 		"MiddlewareFor":  true,
 		"AllowedMethods": true,
+		"Routes":         true,
 	}
 	return internal[name]
 }
@@ -121,8 +167,20 @@ func createControllerHandler(factory ControllerFactory, methodName string, ctrlM
 			return nil
 		}
 
+		mType := method.Type()
+
 		handler := func(ctx *Context) error {
-			method.Call(nil)
+			var args []reflect.Value
+			if mType.NumIn() == 1 && mType.In(0) == reflect.TypeOf(ctx) {
+				args = []reflect.Value{reflect.ValueOf(ctx)}
+			}
+			results := method.Call(args)
+			if len(results) > 0 {
+				last := results[len(results)-1]
+				if !last.IsNil() && last.Type().Implements(reflect.TypeOf((*error)(nil)).Elem()) {
+					return last.Interface().(error)
+				}
+			}
 			return nil
 		}
 
