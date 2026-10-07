@@ -227,7 +227,7 @@ func (vt *viewTranspiler) transpilePHPBlock(rawCode string, isShortEcho bool) st
 
 	// 2. View load: $this->load->view('partials/header'[, $data])
 	if viewMatch := reViewLoad.FindStringSubmatch(trimmed); viewMatch != nil {
-		viewName := viewMatch[1]
+		viewName := strings.TrimPrefix(viewMatch[1], "/")
 		if !strings.HasSuffix(viewName, ".html") {
 			viewName += ".html"
 		}
