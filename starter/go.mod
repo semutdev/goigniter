@@ -4,7 +4,7 @@ go 1.24.8
 
 require (
 	github.com/joho/godotenv v1.5.1
-	github.com/semutdev/goigniter v0.2.0
+	github.com/semutdev/goigniter v0.3.0
 )
 
 require (
