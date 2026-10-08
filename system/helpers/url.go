@@ -6,17 +6,21 @@ import (
 	"strings"
 )
 
-var baseURL string
+var (
+	baseURL     string
+	initialized bool
+)
 
 // Init sets the base URL.
 func Init(url string) {
 	baseURL = strings.TrimRight(url, "/")
+	initialized = true
 }
 
 // BaseURL returns the base URL with optional path.
 // Example: BaseURL("/css/style.css") → "http://localhost:8080/css/style.css"
 func BaseURL(path ...string) string {
-	if baseURL == "" {
+	if !initialized && baseURL == "" {
 		baseURL = os.Getenv("APP_URL")
 		if baseURL == "" {
 			port := os.Getenv("APP_PORT")
@@ -26,6 +30,7 @@ func BaseURL(path ...string) string {
 			baseURL = "http://localhost" + port
 		}
 		baseURL = strings.TrimRight(baseURL, "/")
+		initialized = true
 	}
 
 	if len(path) > 0 && path[0] != "" {

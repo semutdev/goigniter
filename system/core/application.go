@@ -159,6 +159,11 @@ func (app *Application) Static(prefix, root string) {
 	app.router.Add(http.MethodGet, pattern, handler)
 }
 
+// Register registers a controller with the global registry.
+func (app *Application) Register(controller ControllerInterface, prefix ...string) {
+	globalRegistry.Register(controller, prefix...)
+}
+
 // AutoRoute registers routes for all controllers in the registry.
 func (app *Application) AutoRoute() {
 	globalRegistry.AutoRoute(app)
@@ -281,12 +286,13 @@ func applyMiddleware(handler HandlerFunc, middlewares ...Middleware) HandlerFunc
 
 // TemplateEngine provides template rendering.
 type TemplateEngine struct {
-	dir       string
-	ext       string
-	funcMap   template.FuncMap
-	templates map[string]*template.Template
-	reload    bool
-	mu        sync.RWMutex
+	dir            string
+	ext            string
+	funcMap        template.FuncMap
+	globalTemplate *template.Template
+	templates      map[string]*template.Template
+	reload         bool
+	mu             sync.RWMutex
 }
 
 // TemplateConfig holds configuration for TemplateEngine.
@@ -325,9 +331,19 @@ func (e *TemplateEngine) loadTemplates() error {
 	e.mu.Lock()
 	defer e.mu.Unlock()
 
-	e.templates = make(map[string]*template.Template)
+	root := template.New("").Funcs(e.funcMap)
+	templatesMap := make(map[string]*template.Template)
 
-	return filepath.Walk(e.dir, func(path string, info os.FileInfo, err error) error {
+	type tplFile struct {
+		path           string
+		relSlash       string
+		nameWithoutExt string
+		content        string
+		hasDefine      bool
+	}
+	var files []tplFile
+
+	err := filepath.Walk(e.dir, func(path string, info os.FileInfo, err error) error {
 		if err != nil {
 			return err
 		}
@@ -341,27 +357,94 @@ func (e *TemplateEngine) loadTemplates() error {
 			return err
 		}
 
-		name := strings.TrimSuffix(rel, e.ext)
-		name = strings.ReplaceAll(name, string(os.PathSeparator), "/")
+		relSlash := filepath.ToSlash(rel)
+		nameWithoutExt := strings.TrimSuffix(relSlash, e.ext)
 
-		t, err := e.parseTemplate(path)
+		raw, err := os.ReadFile(path)
 		if err != nil {
 			return err
 		}
+		content := string(raw)
+		hasDefine := strings.Contains(content, "{{define")
 
-		e.templates[name] = t
+		files = append(files, tplFile{
+			path:           path,
+			relSlash:       relSlash,
+			nameWithoutExt: nameWithoutExt,
+			content:        content,
+			hasDefine:      hasDefine,
+		})
 		return nil
 	})
-}
-
-func (e *TemplateEngine) parseTemplate(path string) (*template.Template, error) {
-	content, err := os.ReadFile(path)
 	if err != nil {
-		return nil, err
+		return err
 	}
 
-	t := template.New(filepath.Base(path)).Funcs(e.funcMap)
-	return t.Parse(string(content))
+	// Pass 1: Parse all templates into root
+	for _, f := range files {
+		parsedText := f.content
+		if !f.hasDefine {
+			parsedText = `{{define "` + f.nameWithoutExt + `"}}` + f.content + `{{end}}`
+		}
+		if _, err := root.Parse(parsedText); err != nil {
+			return fmt.Errorf("error parsing template %s: %w", f.relSlash, err)
+		}
+	}
+
+	// Pass 2: Register aliases so templates can be referenced by
+	// full path with extension ("admin/dashboard/index.html"),
+	// with leading slash ("/admin/dashboard/index", "/admin/dashboard/index.html"),
+	// and base name ("_summary_cards.html", "_summary_cards").
+	for _, f := range files {
+		targetName := f.nameWithoutExt
+		if root.Lookup(targetName) == nil {
+			if root.Lookup(f.relSlash) != nil {
+				targetName = f.relSlash
+			}
+		}
+
+		if root.Lookup(targetName) != nil {
+			baseName := filepath.Base(f.relSlash)
+			baseWithoutExt := strings.TrimSuffix(baseName, e.ext)
+
+			aliases := []string{
+				f.nameWithoutExt,
+				f.relSlash,
+				"/" + f.nameWithoutExt,
+				"/" + f.relSlash,
+				baseName,
+				baseWithoutExt,
+			}
+
+			for _, alias := range aliases {
+				if alias == targetName {
+					templatesMap[alias] = root.Lookup(targetName)
+					continue
+				}
+				if root.Lookup(alias) == nil {
+					aliasTmpl := fmt.Sprintf(`{{define %q}}{{template %q .}}{{end}}`, alias, targetName)
+					if _, err := root.Parse(aliasTmpl); err != nil {
+						return fmt.Errorf("error creating alias %s for %s: %w", alias, targetName, err)
+					}
+				}
+				if t := root.Lookup(alias); t != nil {
+					templatesMap[alias] = t
+				}
+			}
+		}
+	}
+
+	// Also index all defined templates from root
+	for _, t := range root.Templates() {
+		tName := t.Name()
+		if tName != "" {
+			templatesMap[tName] = t
+		}
+	}
+
+	e.globalTemplate = root
+	e.templates = templatesMap
+	return nil
 }
 
 // Render renders a template with the given data.
@@ -373,10 +456,27 @@ func (e *TemplateEngine) Render(w io.Writer, name string, data any) error {
 	}
 
 	e.mu.RLock()
-	t, ok := e.templates[name]
-	e.mu.RUnlock()
+	defer e.mu.RUnlock()
 
-	if !ok {
+	var t *template.Template
+	if e.templates != nil {
+		t = e.templates[name]
+	}
+	if t == nil && e.globalTemplate != nil {
+		t = e.globalTemplate.Lookup(name)
+		if t == nil {
+			normName := strings.TrimPrefix(name, "/")
+			t = e.globalTemplate.Lookup(normName)
+			if t == nil {
+				t = e.globalTemplate.Lookup(strings.TrimSuffix(normName, e.ext))
+			}
+			if t == nil {
+				t = e.globalTemplate.Lookup(normName + e.ext)
+			}
+		}
+	}
+
+	if t == nil {
 		return &TemplateNotFoundError{Name: name}
 	}
 
@@ -395,6 +495,26 @@ func (e *TemplateNotFoundError) Error() string {
 // DefaultTemplateFuncs returns the default template function map.
 func DefaultTemplateFuncs() template.FuncMap {
 	return template.FuncMap{
+		"base_url": func(path ...string) string {
+			p := ""
+			if len(path) > 0 {
+				p = path[0]
+			}
+			if p != "" && !strings.HasPrefix(p, "/") {
+				p = "/" + p
+			}
+			return p
+		},
+		"site_url": func(path ...string) string {
+			p := ""
+			if len(path) > 0 {
+				p = path[0]
+			}
+			if p != "" && !strings.HasPrefix(p, "/") {
+				p = "/" + p
+			}
+			return p
+		},
 		"safe": func(s string) template.HTML {
 			return template.HTML(s)
 		},

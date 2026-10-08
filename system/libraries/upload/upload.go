@@ -75,6 +75,8 @@ var (
 	ErrWriteFailed    = errors.New("unable to write the file to disk")
 	ErrFileExists     = errors.New("a file with the same name already exists")
 	ErrInvalidDim     = errors.New("the image dimensions are invalid")
+	ErrSuspiciousFile = errors.New("the uploaded file appears to be suspicious or malicious")
+	ErrMimeMismatch   = errors.New("file extension does not match the detected content type")
 )
 
 // New creates a new Upload instance with default configuration
@@ -273,16 +275,120 @@ func (u *Upload) validateFile() error {
 		u.mimeType = "application/octet-stream"
 	}
 
+	// Get file extension
+	ext := strings.TrimPrefix(strings.ToLower(filepath.Ext(u.file.Filename)), ".")
+
+	// Check for dangerous extensions (always block these)
+	dangerousExtensions := []string{
+		"php", "php3", "php4", "php5", "phtml", "phar",
+		"exe", "bat", "cmd", "com", "msi",
+		"sh", "bash", "zsh", "ksh",
+		"py", "pyc", "pyo", "rb", "pl", "cgi",
+		"asp", "aspx", "jsp", "jspx", "war",
+		"htaccess", "htpasswd",
+		"shtml", "stm", "shtm",
+	}
+	for _, dangerous := range dangerousExtensions {
+		if ext == dangerous {
+			return ErrSuspiciousFile
+		}
+	}
+
+	// Check for double extensions (e.g., file.php.jpg)
+	filename := strings.ToLower(u.file.Filename)
+	parts := strings.Split(filename, ".")
+	if len(parts) > 2 {
+		// Check all parts except the last one for dangerous extensions
+		for i := 0; i < len(parts)-1; i++ {
+			for _, dangerous := range dangerousExtensions {
+				if parts[i] == dangerous {
+							return ErrSuspiciousFile
+						}
+			}
+		}
+	}
+
+	// Check for null byte injection (e.g., file.php%00.jpg)
+	if strings.Contains(u.file.Filename, "\x00") || strings.Contains(u.file.Filename, "%00") {
+		return ErrSuspiciousFile
+	}
+
+	// Check for path traversal in filename
+	if strings.Contains(u.file.Filename, "..") ||
+		strings.Contains(u.file.Filename, "/") ||
+		strings.Contains(u.file.Filename, "\\") {
+		return ErrSuspiciousFile
+	}
+
 	// Check allowed types
 	if u.config.AllowedTypes != "" {
-		ext := strings.TrimPrefix(strings.ToLower(filepath.Ext(u.file.Filename)), ".")
 		allowed := strings.Split(strings.ToLower(u.config.AllowedTypes), "|")
 		if !contains(allowed, ext) {
 			return ErrInvalidType
 		}
 	}
 
+	// Validate that extension matches detected MIME type
+	if err := u.validateMimeType(ext); err != nil {
+		return err
+	}
+
 	return nil
+}
+
+// allowedMimeTypes maps file extensions to their allowed MIME types
+var allowedMimeTypes = map[string][]string{
+	// Images
+	"jpg":  {"image/jpeg"},
+	"jpeg": {"image/jpeg"},
+	"png":  {"image/png"},
+	"gif":  {"image/gif"},
+	"webp": {"image/webp"},
+	"svg":  {"image/svg+xml", "text/plain", "application/xml"},
+	"bmp":  {"image/bmp", "image/x-bmp"},
+	"ico":  {"image/x-icon", "image/vnd.microsoft.icon"},
+	// Documents
+	"pdf":  {"application/pdf"},
+	"doc":  {"application/msword"},
+	"docx": {"application/vnd.openxmlformats-officedocument.wordprocessingml.document"},
+	"xls":  {"application/vnd.ms-excel"},
+	"xlsx": {"application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"},
+	"ppt":  {"application/vnd.ms-powerpoint"},
+	"pptx": {"application/vnd.openxmlformats-officedocument.presentationml.presentation"},
+	// Archives
+	"zip":  {"application/zip", "application/x-zip-compressed"},
+	"rar":  {"application/x-rar-compressed", "application/vnd.rar"},
+	"tar":  {"application/x-tar"},
+	"gz":   {"application/gzip", "application/x-gzip"},
+	// Audio/Video
+	"mp3":  {"audio/mpeg"},
+	"mp4":  {"video/mp4"},
+	"wav":  {"audio/wav", "audio/x-wav"},
+	"webm": {"video/webm", "audio/webm"},
+	// Text
+	"txt":  {"text/plain"},
+	"csv":  {"text/csv", "text/plain"},
+	"json": {"application/json", "text/plain"},
+	"xml":  {"application/xml", "text/xml", "text/plain"},
+}
+
+// validateMimeType checks if the file extension matches the detected MIME type
+func (u *Upload) validateMimeType(ext string) error {
+	allowedMimes, hasMapping := allowedMimeTypes[ext]
+	if !hasMapping {
+		// No mapping defined, allow but log warning
+		return nil
+	}
+
+	detectedMime := strings.ToLower(u.mimeType)
+	for _, allowed := range allowedMimes {
+		if strings.HasPrefix(detectedMime, strings.ToLower(allowed)) {
+			return nil
+		}
+	}
+
+	// MIME type doesn't match extension - potential attack
+	return ErrMimeMismatch
 }
 
 // generateFilename generates the final filename

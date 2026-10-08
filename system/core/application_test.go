@@ -1,8 +1,12 @@
 package core
 
 import (
+	"bytes"
 	"net/http"
 	"net/http/httptest"
+	"os"
+	"path/filepath"
+	"strings"
 	"testing"
 )
 
@@ -131,5 +135,88 @@ func TestApplication_Middleware(t *testing.T) {
 
 	if rec.Body.String() != "executed" {
 		t.Errorf("Middleware not executed, got: %s", rec.Body.String())
+	}
+}
+
+func TestTemplateEngine_GlobalParse(t *testing.T) {
+	dir := t.TempDir()
+
+	// 1. Template with explicit {{define}} block (e.g. auth/forgot.html)
+	if err := os.MkdirAll(filepath.Join(dir, "auth"), 0755); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.WriteFile(filepath.Join(dir, "auth", "forgot.html"), []byte(`{{define "auth/forgot"}}<!DOCTYPE html><html><body>Forgot: {{.Title}}</body></html>{{end}}`), 0644); err != nil {
+		t.Fatal(err)
+	}
+
+	// 2. Bare template without {{define}} (e.g. welcome.html)
+	if err := os.WriteFile(filepath.Join(dir, "welcome.html"), []byte(`<!DOCTYPE html><html><body>Welcome: {{.Title}}</body></html>`), 0644); err != nil {
+		t.Fatal(err)
+	}
+
+	// 3. Layout and partials with cross-file references (e.g. admin/dashboard and admin/dashboard/partials/_summary)
+	if err := os.MkdirAll(filepath.Join(dir, "admin", "dashboard", "partials"), 0755); err != nil {
+		t.Fatal(err)
+	}
+	summaryPartial := `<div class="summary-cards">Cards: {{.Total}}</div>`
+	if err := os.WriteFile(filepath.Join(dir, "admin", "dashboard", "partials", "_summary.html"), []byte(summaryPartial), 0644); err != nil {
+		t.Fatal(err)
+	}
+
+	dashboardHTML := `<main>Dashboard: {{.Title}} - {{ template "admin/dashboard/partials/_summary.html" . }}</main>`
+	if err := os.WriteFile(filepath.Join(dir, "admin", "dashboard", "index.html"), []byte(dashboardHTML), 0644); err != nil {
+		t.Fatal(err)
+	}
+
+	// 4. POS page with leading-slash partial inclusion (e.g. /pos/partials/_grid.html)
+	if err := os.MkdirAll(filepath.Join(dir, "pos", "partials"), 0755); err != nil {
+		t.Fatal(err)
+	}
+	gridPartial := `<div class="grid">Grid Items: {{.Count}}</div>`
+	if err := os.WriteFile(filepath.Join(dir, "pos", "partials", "_grid.html"), []byte(gridPartial), 0644); err != nil {
+		t.Fatal(err)
+	}
+	posHTML := `<div class="pos">{{ template "/pos/partials/_grid.html" . }}</div>`
+	if err := os.WriteFile(filepath.Join(dir, "pos", "index.html"), []byte(posHTML), 0644); err != nil {
+		t.Fatal(err)
+	}
+
+	engine, err := NewTemplateEngine(TemplateConfig{
+		Dir:    dir,
+		Ext:    ".html",
+		Reload: false,
+	})
+	if err != nil {
+		t.Fatalf("NewTemplateEngine failed: %v", err)
+	}
+
+	tests := []struct {
+		name     string
+		data     Map
+		contains []string
+	}{
+		{"auth/forgot", Map{"Title": "Pass"}, []string{"Forgot: Pass"}},
+		{"auth/forgot.html", Map{"Title": "Pass"}, []string{"Forgot: Pass"}},
+		{"welcome", Map{"Title": "GoIgniter"}, []string{"Welcome: GoIgniter"}},
+		{"welcome.html", Map{"Title": "GoIgniter"}, []string{"Welcome: GoIgniter"}},
+		{"admin/dashboard/index", Map{"Title": "Admin", "Total": 42}, []string{"Dashboard: Admin", "Cards: 42"}},
+		{"admin/dashboard/index.html", Map{"Title": "Admin", "Total": 42}, []string{"Dashboard: Admin", "Cards: 42"}},
+		{"pos/index", Map{"Count": 99}, []string{"Grid Items: 99"}},
+		{"/pos/index", Map{"Count": 99}, []string{"Grid Items: 99"}},
+	}
+
+	for _, tt := range tests {
+		var buf bytes.Buffer
+		err := engine.Render(&buf, tt.name, tt.data)
+		if err != nil {
+			t.Errorf("Render(%q) error: %v", tt.name, err)
+			continue
+		}
+		result := buf.String()
+		for _, exp := range tt.contains {
+			if !strings.Contains(result, exp) {
+				t.Errorf("Render(%q) = %q, expected to contain %q", tt.name, result, exp)
+			}
+		}
 	}
 }

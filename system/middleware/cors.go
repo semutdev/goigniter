@@ -19,12 +19,16 @@ type CORSConfig struct {
 }
 
 // DefaultCORSConfig returns a default CORS configuration.
+// WARNING: AllowOrigins defaults to empty for security.
+// You should explicitly set allowed origins in production.
 func DefaultCORSConfig() CORSConfig {
 	return CORSConfig{
-		AllowOrigins: []string{"*"},
-		AllowMethods: []string{"GET", "POST", "PUT", "PATCH", "DELETE", "OPTIONS"},
-		AllowHeaders: []string{"Origin", "Content-Type", "Accept", "Authorization"},
-		MaxAge:       86400,
+		AllowOrigins:     []string{}, // Empty by default - explicitly set allowed origins
+		AllowMethods:    []string{"GET", "POST", "PUT", "PATCH", "DELETE", "OPTIONS"},
+		AllowHeaders:    []string{"Origin", "Content-Type", "Accept", "Authorization"},
+		ExposeHeaders:    []string{},
+		AllowCredentials: false,
+		MaxAge:           86400,
 	}
 }
 
@@ -34,6 +38,7 @@ func CORS() core.Middleware {
 }
 
 // CORSWithConfig returns a CORS middleware with custom config.
+// Note: When AllowCredentials is true, AllowOrigins cannot contain "*"
 func CORSWithConfig(config CORSConfig) core.Middleware {
 	allowMethods := strings.Join(config.AllowMethods, ", ")
 	allowHeaders := strings.Join(config.AllowHeaders, ", ")
@@ -46,7 +51,17 @@ func CORSWithConfig(config CORSConfig) core.Middleware {
 
 			allowOrigin := ""
 			for _, o := range config.AllowOrigins {
-				if o == "*" || o == origin {
+				if o == "*" {
+					// When AllowCredentials is true, we cannot use "*"
+					// Instead, reflect the origin back
+					if config.AllowCredentials {
+						allowOrigin = origin
+					} else {
+						allowOrigin = "*"
+					}
+					break
+				}
+				if o == origin {
 					allowOrigin = o
 					break
 				}

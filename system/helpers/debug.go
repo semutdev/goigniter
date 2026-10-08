@@ -19,7 +19,8 @@ func PrintDebug(data any) {
 
 	if data == nil {
 		fmt.Println("Data is nil")
-		fmt.Println("=========== DEBUG END ===========\n")
+		fmt.Println("=========== DEBUG END ===========")
+		fmt.Println()
 		return
 	}
 
@@ -32,7 +33,8 @@ func PrintDebug(data any) {
 		printValue(reflect.ValueOf(data), 0)
 	}
 
-	fmt.Println("=========== DEBUG END ===========\n")
+	fmt.Println("=========== DEBUG END ===========")
+	fmt.Println()
 }
 
 // printValue recursively prints reflect.Value with indentation

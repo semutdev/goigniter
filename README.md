@@ -15,10 +15,12 @@
 - Zero external HTTP dependencies (net/http stdlib)
 - CodeIgniter-inspired routing & controllers
 - Built-in middleware (logger, recovery, CORS, rate limit, auth)
+- **Security features:** CSRF protection, Security headers, Encrypted sessions
 - Template engine with hot reload
-- Session management (cookie-based)
+- Session management (cookie-based, HMAC signed + AES encrypted)
 - Auto-routing support
 - **Setup wizard** - Create new projects with one command
+- Secure file upload with MIME validation
 
 ---
 
@@ -120,7 +122,8 @@ func main() {
 
 ## Documentation
 
-See [examples/](./examples) for usage patterns.
+- [Examples](./examples/) - Usage patterns
+- [Security Guide](./docs/security.md) - Security best practices
 
 ## Project Structure
 
