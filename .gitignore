@@ -4,4 +4,8 @@ goigniter
 /vendor
 /tmp
 build-errors.log
-CLAUDE.mdgoigniter-starter-*.zip
+CLAUDE.md
+goigniter-starter-*.zip
+pos-cafe/
+pos-cafe-go/
+*.db
