@@ -221,4 +221,4 @@ func (w *Welcome) Health() {
 
 ---
 
-Next: [Database](/guide/07-database) for connecting to SQLite and MySQL.
+Next: [Database](/en/guide/07-database) for connecting to SQLite and MySQL.

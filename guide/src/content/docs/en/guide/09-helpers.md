@@ -138,4 +138,4 @@ if helpers.CSRFValid(c.Ctx, token) {
 
 ---
 
-Next: [Upload Library](/guide/10-upload) for file uploads and image processing.
+Next: [Upload Library](/en/guide/10-upload) for file uploads and image processing.

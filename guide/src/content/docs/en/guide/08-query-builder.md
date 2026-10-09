@@ -155,4 +155,4 @@ config.DB.Scopes(ActiveProducts, PriceGreaterThan(100)).Find(&products)
 
 ---
 
-Next: [Helpers](/guide/09-helpers) for utility functions.
+Next: [Helpers](/en/guide/09-helpers) for utility functions.

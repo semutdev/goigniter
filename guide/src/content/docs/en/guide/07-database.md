@@ -124,4 +124,4 @@ config.DB.Where(models.Product{Name: "Coffee"}).FirstOrCreate(&product)
 
 ---
 
-Next: [Query Builder](/guide/08-query-builder) for building SQL queries with method chaining.
+Next: [Query Builder](/en/guide/08-query-builder) for building SQL queries with method chaining.

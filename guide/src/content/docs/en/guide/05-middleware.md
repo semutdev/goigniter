@@ -250,4 +250,4 @@ func (p *Product) Delete() {
 
 ---
 
-Next: [Template Engine](/guide/06-templates) for rendering HTML views.
+Next: [Template Engine](/en/guide/06-templates) for rendering HTML views.

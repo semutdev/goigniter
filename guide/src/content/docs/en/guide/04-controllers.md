@@ -204,4 +204,4 @@ p.Ctx.NoContent(204)
 
 ---
 
-Next: [Middleware](/guide/05-middleware) for authentication, logging, and security.
+Next: [Middleware](/en/guide/05-middleware) for authentication, logging, and security.

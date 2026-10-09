@@ -114,4 +114,4 @@ func (p *Product) UploadImage() {
 
 ---
 
-Next: [Agentic Migration](/guide/11-agentic) for migrating CodeIgniter 3 projects.
+Next: [Agentic Migration](/en/guide/11-agentic) for migrating CodeIgniter 3 projects.

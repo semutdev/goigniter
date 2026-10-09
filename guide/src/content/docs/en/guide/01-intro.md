@@ -60,4 +60,4 @@ Goigniter might not be for you if:
 
 ---
 
-Ready to start? Head over to [Installation](/guide/02-installation).
+Ready to start? Head over to [Installation](/en/guide/02-installation).

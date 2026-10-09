@@ -140,4 +140,4 @@ app.GET("/example", func(c *core.Context) error {
 
 ---
 
-Manual routing is great for APIs. For applications with many controllers, Goigniter's **AutoRoute** creates routes automatically. Continue to [Controllers & AutoRoute](/guide/04-controllers).
+Manual routing is great for APIs. For applications with many controllers, Goigniter's **AutoRoute** creates routes automatically. Continue to [Controllers & AutoRoute](/en/guide/04-controllers).

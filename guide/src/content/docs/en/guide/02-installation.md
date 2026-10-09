@@ -109,6 +109,6 @@ air
 
 ---
 
-Next: [Routing](/guide/03-routing) to learn how to define routes.
+Next: [Routing](/en/guide/03-routing) to learn how to define routes.
 
-Migrating from CodeIgniter 3? Check [Agentic Migration](/guide/11-agentic) for automated migration with AI assistance.
+Migrating from CodeIgniter 3? Check [Agentic Migration](/en/guide/11-agentic) for automated migration with AI assistance.
