@@ -1,0 +1,31 @@
+---
+title: Selamat Datang di Goigniter
+description: Framework MVC sederhana dan cepat untuk Go.
+template: splash
+hero:
+  tagline: Framework MVC ringan untuk Go. Sederhana seperti CodeIgniter, cepat seperti Go.
+  actions:
+    - text: Mulai
+      link: /id/guide/01-intro
+      icon: right-arrow
+      variant: primary
+    - text: Lihat di GitHub
+      link: https://github.com/semutdev/goigniter
+      icon: external
+---
+
+import { Card, CardGrid } from '@astrojs/starlight/components';
+
+## Mengapa Goigniter?
+
+<CardGrid stagger>
+  <Card title="Struktur MVC" icon="pencil">
+    Controllers, models, views — terstruktur rapi. Tanpa magic, tanpa kejutan.
+  </Card>
+  <Card title="Performa Go" icon="rocket">
+    Binary compiled, concurrent secara bawaan. Ribuan request dengan memory MB-an.
+  </Card>
+  <Card title="Auto Routing" icon="setting">
+    Buat controller, tambah method, langsung jadi route. Tanpa boilerplate.
+  </Card>
+</CardGrid>
